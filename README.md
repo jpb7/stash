@@ -42,7 +42,7 @@ The contents of a given stash will be viewable with:
 
 We're off to a late start due to a complete change in project as originally proposed.
 
-Our next steps will be to
+Our next steps will be to:
 
 1. Create the program structure and needed TOML file.
 2. Make a skeleton for handling command-line arguments and stubs for the functions that will be called upong receiving each of those arguments.
