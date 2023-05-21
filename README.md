@@ -45,7 +45,7 @@ We're off to a late start due to a complete change in project as originally prop
 Our next steps will be to:
 
 1. Create the program structure and needed TOML file.
-2. Make a skeleton for handling command-line arguments and stubs for the functions that will be called upong receiving each of those arguments.
+2. Make a skeleton for handling command-line arguments and stubs for the functions that will be called upon receiving each of those arguments.
 3. Write functions for filesystem operations such as creating directories and moving/copying files.
 4. Integrate the `aes-gcm-siv` crate and its encryption/decryption operations.
 5. Proceed to flex goals.
