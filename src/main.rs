@@ -27,8 +27,10 @@
 //! Authors: Jacob Bentley,
 //!          Richard Duffy
 //! Date:    05/23/2023
-
 #![allow(unused_variables)]
+
+mod stash_lib;
+use stash_lib::{init_stash};
 
 const USAGE: &str = "\nUsage: stash <command> [<args>]";
 
@@ -53,8 +55,12 @@ fn main() {
             }
             let label = &arguments[0];
             let path = &arguments[1];
+            
             // Call a function to create stash folder
-            // init_stash(label, path);
+            match init_stash(label, path){
+                Ok(result) => println!("Directory created successfully"),
+                Err(err) => println!("Failed to create directory"),
+            }
         }
         "ls" => {
             if arguments.len() != 1 {
