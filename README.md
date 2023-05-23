@@ -16,27 +16,27 @@ https://crates.io/crates/aes-gcm-siv.
 
 `stash` will handle creation of a new stash with the command:
 
-	stash init <stash_name> <path/to/stash>
+	stash init <label> <path/to/stash>
 
 The basic syntax of the primary commands will be:
 
-	stash <cmd> <file> <stash_name>
+	stash <cmd> <file> <label>
 
-So, to encrypt a copy of a given file and move it into the default stash, one could use:
+So, to encrypt a copy of a given file and move it into the stash referred to by `label`, one could use:
 
-	stash cp <file>
+	stash cp <file> <label>
 
-One could also move that file into the default stash by using:
+One could also move that file into a given stash by using:
 
-	stash mv <file>
+	stash mv <file> <label>
 
-To restore an encrypted file from the default stash to the current directory, one can use:
+To restore an encrypted file from a stash to the current directory, one can use:
 
-	stash grab <file>
+	stash grab <file> <label>
 
 The contents of a given stash will be viewable with:
 
-	stash ls <stash_name>
+	stash ls <label>
 
 ## Project status
 

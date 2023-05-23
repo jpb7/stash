@@ -1,10 +1,42 @@
+//! Stash
+//!
+//! Command-line utility for managing a stash of encrypted files.
+//!
+//! Usage: stash <command> [<args>]
+//!
+//! Available commands:
+//!   - init <label> <path>: Create a new stash with the given label at the specified path.
+//!   - ls <label>: List the contents of the stash with the given label.
+//!   - mv <file> <label>: Encrypt the file and move it to the stash with the given label.
+//!   - cp <file> <label>: Encrypt the file and copy it to the stash with the given label.
+//!   - grab <file> <label>: Decrypt a file from the stash with the given label and move it to the current directory.
+//!
+//! Note: This utility assumes that the stash has been previously initialized.
+//! If not, use the `init` command to create a new stash before using other commands.
+//!
+//! Example usage:
+//! ```shell
+//! $ stash init my_stash ~/stash
+//! $ stash ls my_stash
+//! $ stash mv secret_file.txt my_stash
+//! $ stash grab secret_file.txt my_stash
+//! ```
+//!
+//! For more information, refer to the documentation of each command and its respective functions.
+//!
+//! Authors: Jacob Bentley,
+//!          Richard Duffy
+//! Date:    05/23/2023
+
 #![allow(unused_variables)]
+
+const USAGE: &str = "\nUsage: stash <command> [<args>]";
 
 fn main() {
     // Parse command line arguments
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
-        println!("Usage: stash <command> [<args>]");
+        println!("{}", USAGE);
         return;
     }
 
@@ -12,61 +44,61 @@ fn main() {
     let command = &args[0];
     let arguments = &args[1..];
 
-    // Handle different command forms using `match`
+    // Handle different commands and arguments
     match command.as_str() {
         "init" => {
-            // Command: stash init <name> <path>
             if arguments.len() != 2 {
-                println!("Usage: stash init <name> <path>");
+                println!("\nUsage: stash init <label> <path>");
                 return;
             }
-            let name = &arguments[0];
+            let label = &arguments[0];
             let path = &arguments[1];
-            // Handle the 'init' command
-            // Call a function or perform the necessary operations
+            // Call a function to create stash folder
+            // init_stash(label, path);
         }
         "ls" => {
-            // Command: stash ls <name>
             if arguments.len() != 1 {
-                println!("Usage: stash ls <name>");
+                println!("\nUsage: stash ls <label>");
                 return;
             }
-            let name = &arguments[0];
-            // Handle the 'ls' command
-            // Call a function or perform the necessary operations
+            let label = &arguments[0];
+            // Call a function to display contents of stash
+            // list_stash(label);
         }
         "mv" => {
-            // Command: stash mv <file>
-            if arguments.len() != 1 {
-                println!("Usage: stash mv <file>");
+            if arguments.len() != 2 {
+                println!("\nUsage: stash mv <file> <label>");
                 return;
             }
             let file = &arguments[0];
-            // Handle the 'mv' command
-            // Call a function or perform the necessary operations
+            let label = &arguments[1];
+            // Call a function to encrypt file and move it to stash
+            // move_file(file, label);
         }
         "cp" => {
-            // Command: stash cp <file>
-            if arguments.len() != 1 {
-                println!("Usage: stash cp <file>");
+            if arguments.len() != 2 {
+                println!("\nUsage: stash cp <file> <label>");
                 return;
             }
             let file = &arguments[0];
-            // Handle the 'cp' command
-            // Call a function or perform the necessary operations
+            let label = &arguments[1];
+            // Call a function to encrypt file and copy it to stash
+            // copy_file(file, label);
         }
         "grab" => {
-            // Command: stash grab <file>
-            if arguments.len() != 1 {
-                println!("Usage: stash grab <file>");
+            if arguments.len() != 2 {
+                println!("\nUsage: stash grab <file> <label>");
                 return;
             }
             let file = &arguments[0];
-            // Handle the 'grab' command
-            // Call a function or perform the necessary operations
+            let label = &arguments[1];
+            // Call a function to decrypt a file and move it to PWD
+            // grab_file(file, label);
         }
         _ => {
+            println!("{}", USAGE);
             println!("Unknown command: {}", command);
+            std::process::exit(1);
         }
     }
 }
