@@ -30,7 +30,7 @@
 #![allow(unused_variables)]
 
 mod stash_lib;
-use stash_lib::{init_stash};
+use stash_lib::{init_stash, list_stash};
 
 const USAGE: &str = "\nUsage: stash <command> [<args>]";
 
@@ -69,7 +69,10 @@ fn main() {
             }
             let label = &arguments[0];
             // Call a function to display contents of stash
-            // list_stash(label);
+            match list_stash(label){
+                Ok(result) => println!("Files listed"),
+                Err(err) => println!("Failed to list"),
+            }  
         }
         "mv" => {
             if arguments.len() != 2 {
