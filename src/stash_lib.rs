@@ -3,7 +3,6 @@ use std::{env, fs, io, path::Path};
 //  Create a new stash directory at `label` in current directory.
 pub fn init_stash(path: &str, label: &str) -> io::Result<()> {
     let new_stash = format!("{}/{}", path, label);
-    println!("\n{:?}", new_stash);
     fs::create_dir(new_stash)?;
 
     Ok(())
