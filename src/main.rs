@@ -85,7 +85,10 @@ fn main() {
             let label = &arguments[1];
 
             //  Encrypt file and move it to stash
-            //  move_file(file, label);
+            match move_file(file, label) {
+                Ok(result) => println!("File moved successfully"),
+                Err(err) => println!("Failed to move file"),
+            }
         }
         "cp" => {
             if arguments.len() != 2 {
@@ -96,10 +99,10 @@ fn main() {
             let label = &arguments[1];
 
             //  Encrypt file and copy it to stash
-            match copy_file(file, label){
+            match copy_file(file, label) {
                 Ok(result) => println!("File copied successfully"),
                 Err(err) => println!("Failed to copy file"),
-            } 
+            }
         }
         "grab" => {
             if arguments.len() != 2 {
