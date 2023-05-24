@@ -30,7 +30,7 @@
 #![allow(unused_variables)]
 
 mod stash_lib;
-use stash_lib::{init_stash, list_stash};
+use stash_lib::{init_stash, list_stash, copy_file};
 
 const USAGE: &str = "\nUsage: stash <command> [<args>]";
 
@@ -92,7 +92,10 @@ fn main() {
             let file = &arguments[0];
             let label = &arguments[1];
             // Call a function to encrypt file and copy it to stash
-            // copy_file(file, label);
+            match copy_file(file,label){
+                Ok(result) => println!("File copied successfully"),
+                Err(err) => println!("Failed to copy file"),
+            } 
         }
         "grab" => {
             if arguments.len() != 2 {
