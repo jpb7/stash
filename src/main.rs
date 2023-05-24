@@ -27,37 +27,38 @@
 //! Authors: Jacob Bentley,
 //!          Richard Duffy
 //! Date:    05/23/2023
+
 #![allow(unused_variables)]
 
 mod stash_lib;
-use stash_lib::{init_stash, list_stash, copy_file};
+use stash_lib::*;
 
 const USAGE: &str = "\nUsage: stash <command> [<args>]";
 
 fn main() {
-    // Parse command line arguments
+    //  Parse command line arguments
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
         println!("{}", USAGE);
         return;
     }
 
-    // Extract the command and its arguments
+    //  Extract the command and its arguments
     let command = &args[0];
     let arguments = &args[1..];
 
-    // Handle different commands and arguments
+    //  Handle different commands and arguments
     match command.as_str() {
         "init" => {
             if arguments.len() != 2 {
-                println!("\nUsage: stash init <label> <path>");
+                println!("\nUsage: stash init <path> <label>");
                 return;
             }
-            let label = &arguments[0];
-            let path = &arguments[1];
-            
-            // Call a function to create stash folder
-            match init_stash(label, path){
+            let path = &arguments[0];
+            let label = &arguments[1];
+
+            //  Create new stash called `label`
+            match init_stash(path, label) {
                 Ok(result) => println!("Directory created successfully"),
                 Err(err) => println!("Failed to create directory"),
             }
@@ -68,11 +69,12 @@ fn main() {
                 return;
             }
             let label = &arguments[0];
-            // Call a function to display contents of stash
-            match list_stash(label){
+
+            //  Display contents of specified stash
+            match list_stash(label) {
                 Ok(result) => println!("Files listed"),
                 Err(err) => println!("Failed to list"),
-            }  
+            }
         }
         "mv" => {
             if arguments.len() != 2 {
@@ -81,8 +83,9 @@ fn main() {
             }
             let file = &arguments[0];
             let label = &arguments[1];
-            // Call a function to encrypt file and move it to stash
-            // move_file(file, label);
+
+            //  Encrypt file and move it to stash
+            //  move_file(file, label);
         }
         "cp" => {
             if arguments.len() != 2 {
@@ -91,8 +94,9 @@ fn main() {
             }
             let file = &arguments[0];
             let label = &arguments[1];
-            // Call a function to encrypt file and copy it to stash
-            match copy_file(file,label){
+
+            //  Encrypt file and copy it to stash
+            match copy_file(file, label){
                 Ok(result) => println!("File copied successfully"),
                 Err(err) => println!("Failed to copy file"),
             } 
@@ -104,8 +108,9 @@ fn main() {
             }
             let file = &arguments[0];
             let label = &arguments[1];
-            // Call a function to decrypt a file and move it to PWD
-            // grab_file(file, label);
+
+            //  Decrypt a file and move it to current directory
+            //  grab_file(file, label);
         }
         _ => {
             println!("{}", USAGE);
