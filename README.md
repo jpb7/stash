@@ -1,6 +1,4 @@
-# Stash
-
-
+# stash
 
 ## Project vision
 
@@ -8,50 +6,51 @@
 
 Basically, `stash` provides a set of terminal commands that allow the user to quickly encrypt a given file or set of files into an encrypted folder (called a stash), and also to decrypt a file or files from a stash into the current directory.
 
-For encryption and decryption, `stash` will use a Rust implementation of the AES-GCM-SIV algorithm which can be found at:
-
-https://crates.io/crates/aes-gcm-siv.
+For encryption and decryption, `stash` will use a Rust implementation of an algorithm to be determined.
 
 ## Usage
 
 `stash` will handle creation of a new stash with the command:
 
-	stash init <label> <path/to/stash>
+	stash init <path/to/stash> <label>
 
-The basic syntax of the primary commands will be:
+The contents of a given stash will be viewable with:
+
+	stash list <label>
+
+The basic syntax of the remaining commands will be:
 
 	stash <cmd> <file> <label>
 
-So, to encrypt a copy of a given file and move it into the stash referred to by `label`, one could use:
+So, to encrypt a given file and move it into the stash referred to by `label`, one could use:
 
-	stash cp <file> <label>
+	stash move <file> <label>
 
-One could also move that file into a given stash by using:
+One could also encrypt and copy that file into a given stash by using:
 
-	stash mv <file> <label>
+	stash copy <file> <label>
 
 To restore an encrypted file from a stash to the current directory, one can use:
 
 	stash grab <file> <label>
 
-The contents of a given stash will be viewable with:
-
-	stash ls <label>
-
 ## Project status
 
-We're off to a late start due to a complete change in project as it was originally proposed.
+So far we have completed these tasks:
+- Create the program structure and needed `TOML` file.
+- Make a skeleton for handling command-line arguments and stubs for the functions that will be called upon receiving each of those arguments.
+- Write functions for basic filesystem operations such as creating directories and moving/copying files.
 
 Our next steps will be to:
 
-1. Create the program structure and needed `TOML` file.
-2. Make a skeleton for handling command-line arguments and stubs for the functions that will be called upon receiving each of those arguments.
-3. Write functions for filesystem operations such as creating directories and moving/copying files.
-4. Integrate the `aes-gcm-siv` crate and its encryption/decryption operations.
-5. Proceed to flex goals.
+1. Implement some unit testing on what we have so far.
+2. Choose an encryption crate and integrate it as a dependency.
+3. Implement encryption along with our filesystem operations.
+4. Design and implement a way to manage and coordinate stash labels (ie. `stash_map`).
+5. Proceed to other flex goals.
 
 ## Flex goals
 
-1. Expand functionality to include multiple stashes.
+1. Expand functionality to include multiple stashes (`stash_map`).
 2. Add initialization for `stash` Linux user and get password from user.
 3. Implement tag system using a serialized hash map.
