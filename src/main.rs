@@ -59,8 +59,8 @@ fn main() {
 
             //  Create new stash called `label`
             match init_stash(path, label) {
-                Ok(result) => println!("Directory created successfully"),
-                Err(err) => println!("Failed to create directory"),
+                Ok(result) => println!("\nDirectory created successfully"),
+                Err(err) => println!("\nFailed to create directory"),
             }
         }
         "ls" => {
@@ -72,8 +72,8 @@ fn main() {
 
             //  Display contents of specified stash
             match list_stash(label) {
-                Ok(result) => println!("Files listed"),
-                Err(err) => println!("Failed to list"),
+                Ok(result) => println!("\nFiles listed"),
+                Err(err) => println!("\nFailed to list"),
             }
         }
         "mv" => {
@@ -86,8 +86,8 @@ fn main() {
 
             //  Encrypt file and move it to stash
             match move_file(file, label) {
-                Ok(result) => println!("File moved successfully"),
-                Err(err) => println!("Failed to move file"),
+                Ok(result) => println!("\nFile moved successfully"),
+                Err(err) => println!("\nFailed to move file"),
             }
         }
         "cp" => {
@@ -100,8 +100,8 @@ fn main() {
 
             //  Encrypt file and copy it to stash
             match copy_file(file, label) {
-                Ok(result) => println!("File copied successfully"),
-                Err(err) => println!("Failed to copy file"),
+                Ok(result) => println!("\nFile copied successfully"),
+                Err(err) => println!("\nFailed to copy file"),
             }
         }
         "grab" => {
@@ -113,7 +113,10 @@ fn main() {
             let label = &arguments[1];
 
             //  Decrypt a file and move it to current directory
-            //  grab_file(file, label);
+            match grab_file(file, label) {
+                Ok(result) => println!("\nFile grabbed successfully"),
+                Err(err) => println!("\nFailed to grab file"),
+            }
         }
         _ => {
             println!("{}", USAGE);
