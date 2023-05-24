@@ -5,10 +5,10 @@
 //! Usage: stash <command> [<args>]
 //!
 //! Available commands:
-//!   - init <label> <path>: Create a new stash with the given label at the specified path.
-//!   - ls <label>: List the contents of the stash with the given label.
-//!   - mv <file> <label>: Encrypt the file and move it to the stash with the given label.
-//!   - cp <file> <label>: Encrypt the file and copy it to the stash with the given label.
+//!   - init <path> <label>: Create a new stash with the given label at the specified path.
+//!   - list <label>: List the contents of the stash with the given label.
+//!   - move <file> <label>: Encrypt the file and move it to the stash with the given label.
+//!   - copy <file> <label>: Encrypt the file and copy it to the stash with the given label.
 //!   - grab <file> <label>: Decrypt a file from the stash with the given label and move it to the current directory.
 //!
 //! Note: This utility assumes that the stash has been previously initialized.
@@ -16,9 +16,9 @@
 //!
 //! Example usage:
 //! ```shell
-//! $ stash init my_stash ~/stash
-//! $ stash ls my_stash
-//! $ stash mv secret_file.txt my_stash
+//! $ stash init ~/stash my_stash
+//! $ stash list my_stash
+//! $ stash move secret_file.txt my_stash
 //! $ stash grab secret_file.txt my_stash
 //! ```
 //!
@@ -26,7 +26,7 @@
 //!
 //! Authors: Jacob Bentley,
 //!          Richard Duffy
-//! Date:    05/23/2023
+//! Date:    05/24/2023
 
 #![allow(unused_variables)]
 
@@ -63,9 +63,9 @@ fn main() {
                 Err(err) => println!("\nFailed to create directory"),
             }
         }
-        "ls" => {
+        "list" => {
             if arguments.len() != 1 {
-                println!("\nUsage: stash ls <label>");
+                println!("\nUsage: stash list <label>");
                 return;
             }
             let label = &arguments[0];
@@ -76,9 +76,9 @@ fn main() {
                 Err(err) => println!("\nFailed to list"),
             }
         }
-        "mv" => {
+        "move" => {
             if arguments.len() != 2 {
-                println!("\nUsage: stash mv <file> <label>");
+                println!("\nUsage: stash move <file> <label>");
                 return;
             }
             let file = &arguments[0];
@@ -90,9 +90,9 @@ fn main() {
                 Err(err) => println!("\nFailed to move file"),
             }
         }
-        "cp" => {
+        "copy" => {
             if arguments.len() != 2 {
-                println!("\nUsage: stash cp <file> <label>");
+                println!("\nUsage: stash copy <file> <label>");
                 return;
             }
             let file = &arguments[0];
