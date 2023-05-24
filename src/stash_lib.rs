@@ -57,3 +57,16 @@ pub fn copy_file(src: &str, dst: &str) -> io::Result<()> {
 
     Ok(())
 }
+
+//  Move `file` from stash `label` to `file` in current directory.
+pub fn grab_file(file: &str, label: &str) -> io::Result<()> {
+    let src = format!("{}/{}", label, file);
+    let src_path = Path::new(&src);
+
+    let dst = format!("{}/{}", env::current_dir()?.display(), file);
+    let dst_path = Path::new(&dst);
+
+    fs::rename(src_path, dst_path)?;
+
+    Ok(())
+}
