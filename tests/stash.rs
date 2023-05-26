@@ -41,6 +41,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
+    #[should_panic]
     fn test_init_stash_label_with_invalid_characters_fails() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path().to_str().unwrap();
