@@ -1,4 +1,4 @@
-//! Stash
+//! stash
 //!
 //! Command-line utility for managing a stash of encrypted files.
 //!
@@ -19,6 +19,7 @@
 //! $ stash init ~/stash my_stash
 //! $ stash list my_stash
 //! $ stash move secret_file.txt my_stash
+//! $ stash copy secret_file.txt my_stash
 //! $ stash grab secret_file.txt my_stash
 //! ```
 //!
@@ -26,12 +27,10 @@
 //!
 //! Authors: Jacob Bentley,
 //!          Richard Duffy
-//! Date:    05/24/2023
 
 #![allow(unused_variables)]
 
-mod stash_lib;
-use stash_lib::*;
+use stash::*;
 
 const USAGE: &str = "\nUsage: stash <command> [<args>]";
 
