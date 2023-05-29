@@ -43,9 +43,7 @@ fn create_tarball(path: &str, label: &str) -> Result<(), io::Error> {
         ));
     }
 
-    let contents = String::from_utf8_lossy(&ls).trim().to_string();
-
-    Ok(contents)
+    Ok(())
 }
 
 #[allow(dead_code)]
