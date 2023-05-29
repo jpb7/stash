@@ -7,37 +7,41 @@ mod tests {
     #[test]
     fn test_init_stash_valid_label_succeeds() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-
         let temp_path = temp_dir.path().to_str().unwrap();
 
-        assert!(init_stash(temp_path, "my_stash").is_ok());
+        let result = init_stash(temp_path, "my_stash");
+
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_init_stash_empty_label_fails() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-
         let temp_path = temp_dir.path().to_str().unwrap();
 
-        assert!(init_stash(temp_path, "").is_err());
+        let result = init_stash(temp_path, "");
+
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_init_stash_recursive_label_fails() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-
         let temp_path = temp_dir.path().to_str().unwrap();
+        
+        let result = init_stash(temp_path, "path/to/my_stash");
 
-        assert!(init_stash(temp_path, "path/to/my_stash").is_err());
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_init_stash_glob_label_fails() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
-
         let temp_path = temp_dir.path().to_str().unwrap();
 
-        assert!(init_stash(temp_path, "my_glob_label/*").is_err());
+        let result = init_stash(temp_path, "my_glob_label/*");
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -46,11 +50,11 @@ mod tests {
     fn test_init_stash_label_with_invalid_characters_fails() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path().to_str().unwrap();
-
-        //  Specify label with invalid characters
         let invalid_label = "my:stash?";
 
-        assert!(init_stash(temp_path, invalid_label).is_err());
+        let result = init_stash(temp_path, invalid_label);
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -63,8 +67,9 @@ mod tests {
         while long_label.len() < 256 {
             long_label.push_str("X");
         }
+        let result = init_stash(temp_path, &long_label);
 
-        assert!(init_stash(temp_path, &long_label).is_err());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -77,8 +82,10 @@ mod tests {
         let stash = format!("{}/{}", temp_path, label);
         fs::create_dir(&stash).expect("Failed to create stash directory");
 
+        let result = init_stash(temp_path, label);
+
         //  Try to initialize stash at same path as directory above
-        assert!(init_stash(temp_path, label).is_err());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -90,8 +97,10 @@ mod tests {
         let temp_file = format!("{}/my_stash", temp_path);
         fs::File::create(&temp_file).expect("Failed to create temp file");
 
+        let result = init_stash(temp_path, "my_stash");
+
         //  Try to initialize stash at same path as file
-        assert!(init_stash(temp_path, "my_stash").is_err());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -103,7 +112,9 @@ mod tests {
         let bogus_path = temp_path.to_str().unwrap();
 
         //  Try to initialize stash in nonexistent directory
-        assert!(init_stash(bogus_path, "my_stash").is_err());
+        let result = init_stash(bogus_path, "my_stash");
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -114,13 +125,13 @@ mod tests {
         //  Create a directory with no write permissions
         let readonly_directory = format!("{}/my_stash", temp_path);
         fs::create_dir(&readonly_directory).expect("Failed to create temporary directory");
-
         let mut permissions = fs::metadata(&readonly_directory).unwrap().permissions();
         permissions.set_readonly(true);
         fs::set_permissions(&readonly_directory, permissions).unwrap();
 
-        //  Try to initialize stash in readonly directory
-        assert!(init_stash(temp_path, "my_stash").is_err());
-    }
+        let result = init_stash(temp_path, "my_stash");
 
+        //  Try to initialize stash in readonly directory
+        assert!(result.is_err());
+    }
 }

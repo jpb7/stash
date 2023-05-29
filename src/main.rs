@@ -71,7 +71,7 @@ fn main() {
 
             //  Display contents of specified stash
             match list_stash(label) {
-                Ok(result) => println!("\nFiles listed"),
+                Ok(contents) => println!("\n{}", contents),
                 Err(err) => println!("\nFailed to list"),
             }
         }

@@ -9,18 +9,17 @@ pub fn init_stash(path: &str, label: &str) -> io::Result<()> {
 }
 
 //  List all files in stash directory at `label` in current directory.
-pub fn list_stash(label: &str) -> io::Result<()> {
+pub fn list_stash(label: &str) -> io::Result<String> {
     let stash_path = env::current_dir()?.join(label);
-    let dir = fs::read_dir(stash_path)?;
+    let ls = std::process::Command::new("ls")
+        .arg(&stash_path)
+        .output()
+        .expect("Failed to execute ls command")
+        .stdout;
 
-    for file in dir {
-        let path = file?.path();
-        if path.is_file() {
-            println!("{}", path.display());
-        }
-    }
+    let contents = String::from_utf8_lossy(&ls).trim().to_string();
 
-    Ok(())
+    Ok(contents)
 }
 
 //  Append `dst` to `src` path, validate, and return both paths.
