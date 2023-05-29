@@ -43,7 +43,9 @@ fn create_tarball(path: &str, label: &str) -> Result<(), io::Error> {
         ));
     }
 
-    Ok(())
+    let contents = String::from_utf8_lossy(&ls).trim().to_string();
+
+    Ok(contents)
 }
 
 #[allow(dead_code)]
@@ -100,36 +102,20 @@ pub fn list_stash(label: &str) -> io::Result<String> {
     Ok(contents)
 }
 
-//  Append `dst` to `src` path, validate, and return both paths.
-fn get_paths(src: &str, dst: &str) -> (Box<Path>, Box<Path>) {
-    let src_path = Path::new(src).to_owned().into_boxed_path();
-    let dst_path = Path::new(dst)
-        .join(
-            src_path
-                .file_name()
-                .ok_or(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Invalid source file path",
-                ))
-                .unwrap(),
-        )
-        .into_boxed_path();
-
-    (src_path, dst_path)
-}
-
-//  Move file from `src` to `dst`.
-pub fn move_file(src: &str, dst: &str) -> io::Result<()> {
-    let (src_path, dst_path) = get_paths(src, dst);
-    fs::rename(src_path, dst_path)?;
+//  Move `file` into stash at `label`
+pub fn move_file(file: &str, label: &str) -> io::Result<()> {
+    let file_path = Path::new(file);
+    let stash_path = Path::new(label).join(file_path.file_name().unwrap());
+    fs::rename(file_path, stash_path)?;
 
     Ok(())
 }
 
-//  Copy file from `src` to `dst`.
-pub fn copy_file(src: &str, dst: &str) -> io::Result<()> {
-    let (src_path, dst_path) = get_paths(src, dst);
-    fs::copy(src_path, dst_path)?;
+//  Copy `file` into stash at `label`
+pub fn copy_file(file: &str, label: &str) -> io::Result<()> {
+    let file_path = Path::new(file);
+    let stash_path = Path::new(label).join(file_path.file_name().unwrap());
+    fs::copy(file_path, stash_path)?;
 
     Ok(())
 }
