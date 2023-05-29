@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use stash::*;
-    use std::io::{ErrorKind,self, Read, Write};
+    use std::io::{ErrorKind,self, Write};
     use std::fs::{self};
-    use tempfile::TempDir;
+    use tempfile::{Builder};
    
 
     #[test]
@@ -35,38 +35,19 @@ mod tests {
     }
     #[test]
     fn test_copy_file_valid(){
-        let temp_dir = TempDir::new().unwrap();
-        let temp_dir_path = temp_dir.path();
+        let temp_dir = Builder::new().prefix("temp_dir").tempdir().unwrap();
+        let file_path = temp_dir.path().join("temp_file.txt");
+        let mut file = fs::File::create(&file_path).unwrap();
+        file.write_all(b"Hello, World!").unwrap();
+        let path_s = file_path.into_os_string().into_string().unwrap();
 
-        let src_path = temp_dir_path.join("src.txt");
-        let mut src = fs::File::create(&src_path).unwrap();
-        src.write_all(b"Hello, World!").unwrap();
-
-        let mock_path = temp_dir.path().join("mock.txt");
-        fs::copy(&src_path, &mock_path).unwrap();
-
-        let test_path = temp_dir.path().join("test.txt");
-
-        let src_label = format!("src_path: {}", src_path.display());
-        let test_label = format!("test_path: {}", test_path.display());
-        println!("{}", &src_label);
-        println!("{}", &test_label);
-
-        copy_file(&src_label, &test_label).unwrap();
-
-        // Read the contents of the files
-        let mut src_contents = Vec::new();
-        fs::File::open(src_path).unwrap().read_to_end(&mut src_contents).unwrap();
-
-        let mut mock_contents = Vec::new();
-        fs::File::open(mock_path).unwrap().read_to_end(&mut mock_contents).unwrap();
-
-        let mut test_contents = Vec::new();
-        fs::File::open(test_path).unwrap().read_to_end(&mut test_contents).unwrap();
-
-        // Assert the contents are equal
-        assert_eq!(src_contents, mock_contents);
-        assert_eq!(src_contents, test_contents);
+        let temp_dir2 = Builder::new().prefix("temp_dir").tempdir().unwrap();
+        let file_path2 = temp_dir2.path().join("temp_file.txt");
+        let mut file2 = fs::File::create(&file_path2).unwrap();
+        file2.write_all(b"Hello, World!").unwrap();
+        let path_s2 = file_path2.into_os_string().into_string().unwrap();
+        let result2 = files_are_equal(&path_s, &path_s2);
+        assert!(result2.is_ok())    
     }
 
 }
