@@ -31,18 +31,14 @@ mod tests {
 
    #[test]
    fn test_move_file() -> io::Result<()> {
-    // Create a temporary directory
     let src_dir = tempdir()?;
     let dst_dir = tempdir()?;
 
-    // Create a source file in the temporary directory
     let src_file = src_dir.path().join("test.txt");
     fs::write(&src_file, "")?;
 
-    // Call the move_file function
     move_file(src_file.to_str().unwrap(), dst_dir.path().to_str().unwrap())?;
 
-    // Assert that the file was moved to the destination directory
     let dst_file = dst_dir.path().join("test.txt");
     assert!(dst_file.exists());
 
