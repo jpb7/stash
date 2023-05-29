@@ -4,6 +4,8 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    //  Tests for `init_stash()`
+
     #[test]
     fn test_init_stash_valid_label_succeeds() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
