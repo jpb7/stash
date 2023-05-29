@@ -28,7 +28,7 @@ mod tests {
     fn test_init_stash_recursive_label_fails() {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let temp_path = temp_dir.path().to_str().unwrap();
-        
+
         let result = init_stash(temp_path, "path/to/my_stash");
 
         assert!(result.is_err());
