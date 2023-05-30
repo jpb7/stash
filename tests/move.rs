@@ -1,48 +1,131 @@
 #[cfg(test)]
 mod tests {
     use stash::*;
-    use tempfile::tempdir;
     use std::{
         fs,
-        io::{self, ErrorKind},
+        io::{self, ErrorKind, Read, Write},
     };
+    use tempfile::TempDir;
 
-    #[test]
-    fn test_move_file_source_not_found() {
-        let src_path = "test_files/nonexistent_file.txt";
-        let dst_path = "test_files/dst_file.txt";
-        let result = move_file(src_path, dst_path);
+    //  Tests for `move_file()`
 
-        assert!(result.is_err(), "Expected move_file to return an error");
-        let error = result.unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::NotFound, "Expected source not found error");
-    }
+    //  NOTE: these will need to be revisited once we move to a default stash
+    //        at ~/.stash
 
-    #[test]
-    fn test_move_file_destination_not_found(){
-        let src_path = "test_files/dst_file.txt";
-        let dst_path = "test_files/nonexistent_file.txt";
-        let result = move_file(src_path, dst_path);
+    //  TODO: make label optional (path within stash) in `move_file()`
 
-        assert!(result.is_err(), "Expected move_file to return an error");
-        let error = result.unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::NotFound, "Expected destination not found error");
-    }
+    //  TODO: detect optional path argument
+    //  TODO: confirm valid label
+    //  TODO: check for bad label
+    //  TODO: check for empty label
+    //  TODO: confirm file is encrypted
+    //  TODO: confirm file appears in tar archive with `list_stash()`
+    //  TODO: confirm file is still in original location
+    //  TODO: modify and re-use other filesystem/naming tests from `init.rs`
 
     #[test]
     fn test_move_file() -> io::Result<()> {
-        let src_dir = tempdir()?;
-        let dst_dir = tempdir()?;
+        //  Create temp directory and path
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
 
-        let src_file = src_dir.path().join("test.txt");
-        fs::write(&src_file, "")?;
+        //  Create source file with some text
+        let src_path = temp_path.join("test.txt");
+        let mut src = fs::File::create(&src_path).unwrap();
+        src.write_all(b"Sample text").unwrap();
 
-        move_file(src_file.to_str().unwrap(), dst_dir.path().to_str().unwrap())?;
+        //  Create stash directory and path
+        let stash_dir = TempDir::new().unwrap();
+        let stash_path = stash_dir.path();
 
-        let dst_file = dst_dir.path().join("test.txt");
-        assert!(dst_file.exists());
+        //  Create strings from paths
+        let file = src_path.to_str().unwrap();
+        let label = stash_path.to_str().unwrap();
+
+        //  Move source file into stash directory
+        let result = move_file(&file, &label);
+
+        //  Should succeed
+        assert!(result.is_ok());
+
+        //  Check that file actually moved into stash
+        let stashed_file = stash_path.join("test.txt");
+        assert!(stashed_file.exists());
+
+        //  Read the contents of the stashed file
+        let mut stashed_contents = Vec::new();
+        fs::File::open(&stashed_file)
+            .unwrap()
+            .read_to_end(&mut stashed_contents)
+            .unwrap();
+
+        //  Check that the contents of the stashed file are correct
+        assert_eq!(stashed_contents, b"Sample text");
 
         Ok(())
     }
 
+    #[test]
+    fn test_move_file_source_not_found() {
+        //  Create temp directory and path
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+
+        //  Create nonexistent path to file that doesn't exist
+        let src_path = temp_path.join("nonexistent.txt");
+
+        //  Create stash directory to move file into
+        let stash_path = temp_path.join("stash");
+        fs::create_dir(&stash_path).unwrap();
+
+        //  Create strings from paths
+        let file = src_path.to_str().unwrap();
+        let label = stash_path.to_str().unwrap();
+
+        //  Try to move nonexistent file into stash
+        let result = move_file(&file, &label);
+
+        //  Should fail
+        assert!(result.is_err());
+
+        //  Check that correct error message is thrown
+        let error = result.unwrap_err();
+        assert_eq!(
+            error.kind(),
+            ErrorKind::NotFound,
+            "Expected source not found error"
+        );
+    }
+
+    #[test]
+    fn test_move_file_stash_not_found() {
+        //  Create temp directory and path
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+
+        //  Create source file in temp directory
+        let src_path = temp_path.join("test.txt");
+        fs::File::create(&src_path).unwrap();
+
+        //  Add path in temp directory to stash which doesn't exist
+        let stash_path = temp_path.join("nonexistent_stash");
+
+        //  Create strings from paths
+        let file = src_path.to_str().unwrap();
+        let label = stash_path.to_str().unwrap();
+
+        //  Try to move source file into nonexistent stash
+        let result = move_file(&file, &label);
+
+        //  Should fail
+        assert!(result.is_err());
+
+        //  Check that correct error message is thrown
+        let error = result.unwrap_err();
+        assert_eq!(
+            error.kind(),
+            ErrorKind::NotFound,
+            "Expected destination not found error"
+        );
+    }
 }
