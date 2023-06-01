@@ -73,7 +73,7 @@ fn main() {
             }
         }
         "add" => {
-            if arguments.len() > 1 {
+            if arguments.len() != 1 {
                 eprintln!("usage: stash add <file>");
                 return;
             }
@@ -87,7 +87,7 @@ fn main() {
             }
         }
         "copy" => {
-            if arguments.len() > 1 {
+            if arguments.len() != 1 {
                 eprintln!("usage: stash copy <file>");
                 return;
             }
@@ -101,7 +101,7 @@ fn main() {
             }
         }
         "grab" => {
-            if arguments.len() > 1 {
+            if arguments.len() != 1 {
                 eprintln!("usage: stash grab <file>");
                 return;
             }
