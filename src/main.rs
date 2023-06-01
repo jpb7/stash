@@ -5,22 +5,22 @@
 //! Usage: stash <command> [<args>]
 //!
 //! Available commands:
-//!   - init <path> <label>: Create a new stash with the given label at the specified path.
-//!   - list <label>: List the contents of the stash with the given label.
-//!   - move <file> <label>: Encrypt the file and move it to the stash with the given label.
-//!   - copy <file> <label>: Encrypt the file and copy it to the stash with the given label.
-//!   - grab <file> <label>: Decrypt a file from the stash with the given label and move it to the current directory.
+//!   - init: Create a new stash at `~/.stash`.
+//!   - list: List the contents of the stash.
+//!   - add <file>: Encrypt a file and add it to the stash.
+//!   - copy <file>: Encrypt a file and copy it into the stash.
+//!   - grab <file>: Decrypt a file from the stash and drop it in the current directory.
 //!
 //! Note: This utility assumes that the stash has been previously initialized.
 //! If not, use the `init` command to create a new stash before using other commands.
 //!
 //! Example usage:
 //! ```shell
-//! $ stash init ~/stash my_stash
-//! $ stash list my_stash
-//! $ stash move secret_file.txt my_stash
-//! $ stash copy secret_file.txt my_stash
-//! $ stash grab secret_file.txt my_stash
+//! $ stash init
+//! $ stash list
+//! $ stash add secret_file.txt
+//! $ stash copy secret_file.txt
+//! $ stash grab secret_file.txt
 //! ```
 //!
 //! For more information, refer to the documentation of each command and its respective functions.
@@ -32,7 +32,7 @@
 
 use stash::*;
 
-const USAGE: &str = "\nUsage: stash <command> [<args>]";
+const USAGE: &str = "usage: stash <command> [<args>]";
 
 fn main() {
     //  Parse command line arguments
@@ -49,77 +49,74 @@ fn main() {
     //  Handle different commands and arguments
     match command.as_str() {
         "init" => {
-            if arguments.len() != 2 {
-                println!("\nUsage: stash init <path> <label>");
+            if !arguments.is_empty() {
+                eprintln!("usage: stash init");
                 return;
             }
-            let path = &arguments[0];
-            let label = &arguments[1];
 
-            //  Create new stash called `label`
-            match init_stash(path, label) {
-                Ok(result) => println!("\nDirectory created successfully"),
-                Err(err) => println!("\nFailed to create directory"),
+            //  Create new stash at `~/.stash`
+            match init() {
+                Ok(result) => println!("New stash initialized"),
+                Err(err) => eprintln!("{}", err),
             }
         }
         "list" => {
-            if arguments.len() != 1 {
-                println!("\nUsage: stash list <label>");
+            if !arguments.is_empty() {
+                eprintln!("usage: stash list");
                 return;
             }
-            let label = &arguments[0];
 
-            //  Display contents of specified stash
-            match list_stash(label) {
-                Ok(contents) => println!("\n{}", contents),
-                Err(err) => println!("\nFailed to list"),
+            //  Display contents of stash
+            match list() {
+                Ok(contents) => println!("{}", contents),
+                Err(err) => eprintln!("{}", err),
             }
         }
-        "move" => {
-            if arguments.len() != 2 {
-                println!("\nUsage: stash move <file> <label>");
+        "add" => {
+            if arguments.len() > 1 {
+                eprintln!("usage: stash add <file>");
                 return;
             }
-            let file = &arguments[0];
-            let label = &arguments[1];
 
-            //  Encrypt file and move it to stash
-            match move_file(file, label) {
-                Ok(result) => println!("\nFile moved successfully"),
-                Err(err) => println!("\nFailed to move file"),
+            let file = &arguments[0];
+
+            //  Encrypt file and add it to stash
+            match add(file) {
+                Ok(result) => println!("File added successfully"),
+                Err(err) => println!("{}", err),
             }
         }
         "copy" => {
-            if arguments.len() != 2 {
-                println!("\nUsage: stash copy <file> <label>");
+            if arguments.len() > 1 {
+                eprintln!("usage: stash copy <file>");
                 return;
             }
+
             let file = &arguments[0];
-            let label = &arguments[1];
 
             //  Encrypt file and copy it to stash
-            match copy_file(file, label) {
-                Ok(result) => println!("\nFile copied successfully"),
-                Err(err) => println!("\nFailed to copy file"),
+            match copy(file) {
+                Ok(result) => println!("File copied successfully"),
+                Err(err) => eprintln!("{}", err),
             }
         }
         "grab" => {
-            if arguments.len() != 2 {
-                println!("\nUsage: stash grab <file> <label>");
+            if arguments.len() > 1 {
+                eprintln!("usage: stash grab <file>");
                 return;
             }
+
             let file = &arguments[0];
-            let label = &arguments[1];
 
             //  Decrypt a file and move it to current directory
-            match grab_file(file, label) {
-                Ok(result) => println!("\nFile grabbed successfully"),
-                Err(err) => println!("\nFailed to grab file"),
+            match grab(file) {
+                Ok(result) => println!("File grabbed successfully"),
+                Err(err) => eprintln!("{}", err),
             }
         }
         _ => {
-            println!("{}", USAGE);
-            println!("Unknown command: {}", command);
+            eprintln!("{}", USAGE);
+            eprintln!("Unknown command: {}", command);
             std::process::exit(1);
         }
     }
