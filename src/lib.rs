@@ -1,5 +1,5 @@
 use aes_gcm::{
-    aead::{Aead, AeadCore, AeadInPlace, KeyInit, OsRng},
+    aead::{AeadCore, AeadInPlace, KeyInit, OsRng},
     Aes256Gcm,
 };
 use std::io::{self, Read, Seek, Write};
@@ -142,28 +142,6 @@ fn encrypt(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-//  Create an encrypted copy of a specified file
-fn encrypt_a_copy(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
-    let stash_path = get_stash_path();
-    if !stash_path.exists() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
-    }
-    let output_path = stash_path.join(path.file_name().unwrap());
-
-    let mut input_file = fs::File::open(path)?;
-    let mut output_file = fs::File::create(output_path)?;
-
-    let mut input_buffer = Vec::new();
-    input_file.read_to_end(&mut input_buffer)?;
-
-    let cipher = Aes256Gcm::new(key.into());
-
-    let encrypted_buffer = cipher.encrypt(nonce.into(), input_buffer.as_ref()).unwrap();
-    output_file.write_all(&encrypted_buffer)?;
-
-    Ok(())
-}
-
 #[allow(dead_code)]
 //  Decrypt a file in place
 fn decrypt(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
@@ -199,7 +177,8 @@ pub fn copy(file: &str) -> io::Result<()> {
 
     let file_key = Aes256Gcm::generate_key(OsRng);
     let nonce = Aes256Gcm::generate_nonce(OsRng);
-    encrypt_a_copy(&dst_path, &file_key, &nonce)?;
+    encrypt(&dst_path, &file_key, &nonce)?;
+    //decrypt(&dst_path, &file_key, &nonce)?;
 
     //  TODO: decrypt `contents` file (tarball) using `stash_key`
     //  TODO: unpack decrypted tarball
