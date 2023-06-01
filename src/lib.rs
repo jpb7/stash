@@ -11,7 +11,7 @@ use std::{
 use tempfile::TempDir;
 
 //  Specify `~/.stash` as default path; use temp directory when testing
-//  TODO: add Result as return value
+//  TODO: add Result as return value...?
 fn get_stash_path() -> PathBuf {
     #[cfg(not(test))]
     {
@@ -21,6 +21,7 @@ fn get_stash_path() -> PathBuf {
         };
         home.join(".stash")
     }
+    //  TODO: this logic will not work for our tests
     #[cfg(test)]
     {
         let temp_dir = TempDir::new().unwrap();
@@ -31,7 +32,7 @@ fn get_stash_path() -> PathBuf {
 //  Create a new stash in user's home directory
 pub fn init() -> io::Result<()> {
     let stash_path = get_stash_path();
-    //let contents = stash_path.join("contents");
+    let contents = stash_path.join("contents");
 
     if stash_path.exists() {
         return Err(io::Error::new(
@@ -41,10 +42,11 @@ pub fn init() -> io::Result<()> {
     }
 
     fs::create_dir_all(stash_path.to_str().unwrap())?;
-    //create_tarball(&contents)?;
+    create_tarball()?;
 
-    //let stash_key = Aes256Gcm::generate_key(OsRng);
-    //encrypt(&contents, &stash_key)?;
+    let stash_key = Aes256Gcm::generate_key(OsRng);
+    let nonce = Aes256Gcm::generate_nonce(OsRng);
+    encrypt(&contents, &stash_key, &nonce)?;
 
     //  TODO: store key on keyring
 
@@ -52,12 +54,11 @@ pub fn init() -> io::Result<()> {
 }
 
 //  Create a `.tar.gz` archive
-#[allow(dead_code)]
-fn create_tarball(archive_path: &Path) -> Result<(), io::Error> {
+fn create_tarball() -> Result<(), io::Error> {
     let stash_path = get_stash_path();
     let output = std::process::Command::new("tar")
         .arg("czf")
-        .arg(archive_path)
+        .arg(stash_path.join("contents"))
         .arg(stash_path)
         .output()?;
 
@@ -69,48 +70,6 @@ fn create_tarball(archive_path: &Path) -> Result<(), io::Error> {
             format!("Failed to create tar archive: {}", err_msg),
         ));
     }
-
-    Ok(())
-}
-
-//  Encrypt a specified file in place
-fn encrypt(path: &Path, key: &[u8]) -> io::Result<()> {
-    let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
-    let mut buffer = Vec::new();
-
-    file.read_to_end(&mut buffer)?;
-
-    let cipher = Aes256Gcm::new(key.into());
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-
-    //  TODO: not sure about empty byte string here
-    cipher.encrypt_in_place(&nonce, b"", &mut buffer).unwrap();
-
-    file.seek(io::SeekFrom::Start(0))?;
-    file.write_all(&buffer)?;
-
-    Ok(())
-}
-
-//  Create an encrypted copy of a specified file
-fn encrypt_a_copy(path: &Path, key: &[u8]) -> io::Result<()> {
-    let stash_path = get_stash_path();
-    if !stash_path.exists() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
-    }
-    let output_path = stash_path.join(path.file_name().unwrap());
-
-    let mut input_file = fs::File::open(path)?;
-    let mut output_file = fs::File::create(output_path)?;
-
-    let mut input_buffer = Vec::new();
-    input_file.read_to_end(&mut input_buffer)?;
-
-    let cipher = Aes256Gcm::new(key.into());
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-
-    let encrypted_buffer = cipher.encrypt(&nonce, input_buffer.as_ref()).unwrap();
-    output_file.write_all(&encrypted_buffer)?;
 
     Ok(())
 }
@@ -149,12 +108,80 @@ pub fn add(file: &str) -> io::Result<()> {
     fs::rename(src_path, &dst_path).unwrap();
 
     let file_key = Aes256Gcm::generate_key(OsRng);
-    encrypt(&dst_path, &file_key)?;
+    let nonce = Aes256Gcm::generate_nonce(OsRng);
+    encrypt(&dst_path, &file_key, &nonce)?;
+    //  For testing that decryption works
+    //decrypt(&dst_path, &file_key, &nonce)?;
 
     //  TODO: decrypt `contents` file (tarball) using `stash_key`
     //  TODO: unpack decrypted tarball
     //  TODO: create new tarball of stash contents
     //  TODO: re-encrypt `contents` using `stash_key`
+
+    Ok(())
+}
+
+//  Encrypt a specified file in place
+fn encrypt(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
+    let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let mut buffer = Vec::new();
+
+    file.read_to_end(&mut buffer)?;
+
+    let cipher = Aes256Gcm::new(key.into());
+    cipher
+        .encrypt_in_place(nonce.into(), b"", &mut buffer)
+        .unwrap();
+
+    file.seek(io::SeekFrom::Start(0))?;
+    file.write_all(&buffer)?;
+
+    //  Truncate the file to the new size
+    file.set_len(buffer.len() as u64)?;
+
+    Ok(())
+}
+
+//  Create an encrypted copy of a specified file
+fn encrypt_a_copy(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
+    let stash_path = get_stash_path();
+    if !stash_path.exists() {
+        return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+    }
+    let output_path = stash_path.join(path.file_name().unwrap());
+
+    let mut input_file = fs::File::open(path)?;
+    let mut output_file = fs::File::create(output_path)?;
+
+    let mut input_buffer = Vec::new();
+    input_file.read_to_end(&mut input_buffer)?;
+
+    let cipher = Aes256Gcm::new(key.into());
+
+    let encrypted_buffer = cipher.encrypt(nonce.into(), input_buffer.as_ref()).unwrap();
+    output_file.write_all(&encrypted_buffer)?;
+
+    Ok(())
+}
+
+#[allow(dead_code)]
+//  Decrypt a file in place
+fn decrypt(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
+    let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let mut buffer = Vec::new();
+
+    file.read_to_end(&mut buffer)?;
+
+    let cipher = Aes256Gcm::new(key.into());
+    cipher
+        .decrypt_in_place(nonce.into(), b"", &mut buffer)
+        .unwrap();
+
+    file.seek(io::SeekFrom::Start(0))?;
+    file.write_all(&buffer)?;
+
+    //  Truncate the file to the new size
+    file.set_len(buffer.len() as u64)?;
 
     Ok(())
 }
@@ -171,7 +198,8 @@ pub fn copy(file: &str) -> io::Result<()> {
     fs::copy(src_path, &dst_path).unwrap();
 
     let file_key = Aes256Gcm::generate_key(OsRng);
-    encrypt_a_copy(&dst_path, &file_key)?;
+    let nonce = Aes256Gcm::generate_nonce(OsRng);
+    encrypt_a_copy(&dst_path, &file_key, &nonce)?;
 
     //  TODO: decrypt `contents` file (tarball) using `stash_key`
     //  TODO: unpack decrypted tarball
