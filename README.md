@@ -10,29 +10,29 @@ For encryption and decryption, `stash` uses the `aes-gcm` crate.
 
 ## Usage
 
-`stash` will handle creation of a new stash with the command:
+`stash` will create a new stash at `~/.stash` using:
 
-	stash init <path/to/stash> <label>
+	stash init
 
 The contents of a given stash will be viewable with:
 
-	stash list <label>
+	stash list
 
 The basic syntax of the remaining commands will be:
 
-	stash <cmd> <file> <label>
+	stash <cmd> <file>
 
-So, to encrypt a given file and move it into the stash referred to by `label`, one could use:
+So, to encrypt a given file and add it to the stash, one could use:
 
-	stash move <file> <label>
+	stash add <file>
 
-One could also encrypt and copy that file into a given stash by using:
+One could also encrypt and copy that file into the stash by using:
 
-	stash copy <file> <label>
+	stash copy <file>
 
-To restore an encrypted file from a stash to the current directory, one can use:
+To grab an encrypted file from the stash, decrypt it, and drop it into the current directory, one can use:
 
-	stash grab <file> <label>
+	stash grab <file>
 
 ## Project status
 
@@ -43,13 +43,15 @@ So far we have completed these tasks:
 - Implement some unit testing on what we have so far.
 - Choose an encryption crate and integrate it as a dependency.
 - Begin implementing encryption along with our filesystem operations.
+- Rewritten our interface and logic to use a single, default stash.
+- Integrated encryption into all of our core functions.
 
 Our next steps will be to:
 
-1. Continue writing unit tests and rewriting core functions as needed.
-2. Continue refining our existing encryption functions and integrating them into the basic filesystem operations we have so far.
-3. Design a secure key management system (ie. encrypted, serialized hash map).
-4. Begin implementing that key management system.
+1. Implement decryption and add it to our core functions.
+2. Design a secure key management system (ie. encrypted, serialized hash map).
+3. Implement that key management system.
+4. Continue writing unit tests and rewriting core functions as needed.
 5. Proceed to flex goals.
 
 ## Flex goals
@@ -57,3 +59,6 @@ Our next steps will be to:
 1. Add initialization for `stash` Linux user and get password from user.
 2. Use that password as a master key for our key management system.
 3. Make error handling more descriptive and robust.
+4. Find a better solution to the `stash_path` problem.
+5. Find a better testing arrangement.
+6. Support nested filepaths in the stash using optional `path` argument.
