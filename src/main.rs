@@ -36,6 +36,8 @@ const USAGE: &str = "usage: stash <command> [<args>]";
 
 fn main() {
     //  Parse command line arguments
+    let mut stash = Stash::new();
+
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
         println!("{}", USAGE);
@@ -55,20 +57,8 @@ fn main() {
             }
 
             //  Create new stash at `~/.stash`
-            match init() {
+            match stash.init() {
                 Ok(result) => println!("New stash initialized"),
-                Err(err) => eprintln!("{}", err),
-            }
-        }
-        "list" => {
-            if !arguments.is_empty() {
-                eprintln!("usage: stash list");
-                return;
-            }
-
-            //  Display contents of stash
-            match list() {
-                Ok(contents) => println!("{}", contents),
                 Err(err) => eprintln!("{}", err),
             }
         }
@@ -81,9 +71,21 @@ fn main() {
             let file = &arguments[0];
 
             //  Encrypt file and add it to stash
-            match add(file) {
+            match stash.add(file) {
                 Ok(result) => println!("File added successfully"),
                 Err(err) => println!("{}", err),
+            }
+        }
+        "list" => {
+            if !arguments.is_empty() {
+                eprintln!("usage: stash list");
+                return;
+            }
+
+            //  Display contents of stash
+            match stash.list() {
+                Ok(contents) => println!("{}", contents),
+                Err(err) => eprintln!("{}", err),
             }
         }
         "copy" => {
@@ -95,7 +97,7 @@ fn main() {
             let file = &arguments[0];
 
             //  Encrypt file and copy it to stash
-            match copy(file) {
+            match stash.copy(file) {
                 Ok(result) => println!("File copied successfully"),
                 Err(err) => eprintln!("{}", err),
             }
@@ -109,7 +111,7 @@ fn main() {
             let file = &arguments[0];
 
             //  Decrypt a file and move it to current directory
-            match grab(file) {
+            match stash.grab(file) {
                 Ok(result) => println!("File grabbed successfully"),
                 Err(err) => eprintln!("{}", err),
             }
