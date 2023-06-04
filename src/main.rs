@@ -28,23 +28,34 @@
 //! Authors: Jacob Bentley,
 //!          Richard Duffy
 
-#![allow(unused_variables)]
-
 use stash::*;
+use std::process::{exit, Command, Stdio};
+use std::{env, io, path::Path};
 
 const USAGE: &str = "usage: stash <command> [<args>]";
 
 fn main() {
     //  Parse command line arguments
-    let mut stash = Stash::new();
-
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
         println!("{}", USAGE);
         return;
     }
+    //  Authenticate as `stash` user
+    let stash_user = "stash";
+    let current_user = env::var("USER").expect("Failed to retrieve current user");
 
-    //  Extract the command and its arguments
+    if !user_exists(stash_user) {
+        create_user(&current_user, stash_user);
+    }
+    //  TODO: use timeout to prevent re-entering password again
+    if current_user != stash_user {
+        run_as_stash(stash_user, args).expect("Failed to execute as stash user");
+        exit(0);
+    }
+    //  Execute main program
+    let mut stash = Stash::new();
+
     let command = &args[0];
     let arguments = &args[1..];
 
@@ -55,10 +66,10 @@ fn main() {
                 eprintln!("usage: stash init");
                 return;
             }
-
+            //  TODO: probably don't need this anymore
             //  Create new stash at `~/.stash`
             match stash.init() {
-                Ok(result) => println!("New stash initialized"),
+                Ok(_) => println!("New stash initialized"),
                 Err(err) => eprintln!("{}", err),
             }
         }
@@ -67,12 +78,11 @@ fn main() {
                 eprintln!("usage: stash add <file>");
                 return;
             }
-
             let file = &arguments[0];
 
             //  Encrypt file and add it to stash
             match stash.add(file) {
-                Ok(result) => println!("File added successfully"),
+                Ok(_) => println!("File added successfully"),
                 Err(err) => println!("{}", err),
             }
         }
@@ -81,7 +91,6 @@ fn main() {
                 eprintln!("usage: stash list");
                 return;
             }
-
             //  Display contents of stash
             match stash.list() {
                 Ok(contents) => println!("{}", contents),
@@ -93,12 +102,11 @@ fn main() {
                 eprintln!("usage: stash copy <file>");
                 return;
             }
-
             let file = &arguments[0];
 
             //  Encrypt file and copy it to stash
             match stash.copy(file) {
-                Ok(result) => println!("File copied successfully"),
+                Ok(_) => println!("File copied successfully"),
                 Err(err) => eprintln!("{}", err),
             }
         }
@@ -107,19 +115,85 @@ fn main() {
                 eprintln!("usage: stash grab <file>");
                 return;
             }
-
             let file = &arguments[0];
 
             //  Decrypt a file and move it to current directory
             match stash.grab(file) {
-                Ok(result) => println!("File grabbed successfully"),
+                Ok(_) => println!("File grabbed successfully"),
                 Err(err) => eprintln!("{}", err),
             }
         }
         _ => {
             eprintln!("{}", USAGE);
             eprintln!("Unknown command: {}", command);
-            std::process::exit(1);
+            exit(1);
         }
     }
+}
+
+//  Return `true` if `user` exists on the local system
+fn user_exists(user: &str) -> bool {
+    Command::new("id")
+        .arg(user)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+//  TODO: add Result return type
+//  Create `stash` user with home directory at `/home/$USER/.stash`
+fn create_user(existing_user: &str, stash_user: &str) {
+    let user_home = env::var("HOME").expect("Failed to retrieve home directory");
+    let stash_path = Path::new(&user_home).join(".stash");
+
+    //  Create `stash` user
+    let useradd = Command::new("sudo")
+        .args([
+            "useradd",
+            "-m",
+            "-G",
+            existing_user,
+            "-d",
+            &stash_path.to_string_lossy(),
+            stash_user,
+        ])
+        .output()
+        .expect("Failed to create user");
+
+    if !useradd.status.success() {
+        let err_msg = String::from_utf8_lossy(&useradd.stderr);
+        eprintln!("Error creating user: {}", err_msg);
+        exit(1);
+    }
+    //  Set password for `stash` user
+    let passwd = Command::new("sudo")
+        .args(["passwd", stash_user])
+        .status()
+        .expect("Failed to execute sudo");
+
+    if !passwd.success() {
+        eprintln!("Error setting password for user {}", stash_user);
+        exit(1);
+    }
+    //  End `sudo` session
+    Command::new("sudo")
+        .arg("-k")
+        .status()
+        .expect("Failed to manually terminate sudo session");
+}
+
+//  Log in as `stash` user and re-execute the program with same `args`.
+fn run_as_stash(stash_user: &str, args: Vec<String>) -> Result<(), io::Error> {
+    let current_exe = env::current_exe().expect("Failed to get current executable path");
+
+    Command::new("su")
+        .arg(stash_user)
+        .arg("-c")
+        .arg(format!("{} {}", current_exe.display(), args.join(" ")))
+        .status()
+        .expect("Failed to execute program as stash user");
+
+    Ok(())
 }
