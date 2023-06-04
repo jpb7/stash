@@ -10,7 +10,6 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
 };
-
 #[cfg(test)]
 use tempfile::TempDir;
 
@@ -28,11 +27,10 @@ impl Default for Stash {
 }
 
 impl Stash {
-
     //  Initialize paths at `~/.stash` and `~/.stash/contents`
     pub fn new() -> Self {
         let home = env::var("HOME").expect("Failed to get `HOME` environment variable");
-        let stash_path = Path::new(&home).join(".stash");
+        let stash_path = PathBuf::from(&home);
         let contents_path = stash_path.join("contents");
 
         Stash {
@@ -76,6 +74,7 @@ impl Stash {
         Ok(())
     }
 
+    //  TODO: probably don't need this anymore
     //  Create a new stash in user's home directory
     pub fn init(&mut self) -> io::Result<()> {
         if self.path.exists() {
@@ -84,7 +83,6 @@ impl Stash {
                 "Stash already exists",
             ));
         }
-
         fs::create_dir_all(self.path.to_str().unwrap())?;
         self.create_tarball()?;
 

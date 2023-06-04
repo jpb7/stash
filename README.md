@@ -14,23 +14,23 @@ For encryption and decryption, `stash` uses the `aes-gcm` crate.
 
 	stash init
 
-The contents of a given stash will be viewable with:
+The contents of the stash are viewable with:
 
 	stash list
 
-The basic syntax of the remaining commands will be:
+Basic syntax of the remaining commands is:
 
 	stash <cmd> <file>
 
-So, to encrypt a given file and add it to the stash, one could use:
+So, to encrypt a given file and add it to the stash, use:
 
 	stash add <file>
 
-One could also encrypt and copy that file into the stash by using:
+To encrypt a copy of that file into the stash, use:
 
 	stash copy <file>
 
-To grab an encrypted file from the stash, decrypt it, and drop it into the current directory, one can use:
+To decrypt a stashed file and drop it into the current directory, use:
 
 	stash grab <file>
 
@@ -47,19 +47,18 @@ So far we have completed these tasks:
 - Integrated encryption into all of our core functions.
 - Implemented decryption and added it to our core functions.
 - Moved our core functions into a `Stash` struct that manages its own path.
-- Designed a bespoke key management system (KMS) involving serialization and encryption.
-- Implemented and tested that KMS as a proof of concept.
+- Implemented and tested a bespoke key management system as a proof of concept. (Then scrapped it for Linux keyrings.)
+- Added initialization and authentication for `stash` Linux user.
 
 Our next steps will be to:
 
-1. Continue exploring native Linux key management as an alternative KMS.
+1. Use Linux keyrings to store key/nonce pairs for stashed files.
 2. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-3. Implement a KMS that is integrated into our `Stash` struct.
-4. Proceed to flex goals.
+3. Make error handling more descriptive and robust.
+4. Review and refactor for greater efficiency.
+5. Proceed to flex goals.
 
 ## Flex goals
 
-1. Add initialization for `stash` Linux user and get password from user.
-2. Hash that password using `argon2` to create a master key/nonce pair.
-3. Make error handling more descriptive and robust.
-4. Support nested filepaths in the stash using optional `path` argument.
+1. Add `archive` and `unpack` commands.
+2. Support nested filepaths in the stash using optional `path` argument.
