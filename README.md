@@ -10,9 +10,7 @@ For encryption and decryption, `stash` uses the `aes-gcm` crate.
 
 ## Usage
 
-`stash` will create a new stash at `~/.stash` using:
-
-	stash init
+Upon initialization, the user is prompted to create a password for the `stash` user. A new stash will then be created at `~/.stash`.
 
 The contents of the stash are viewable with:
 
@@ -33,6 +31,12 @@ To encrypt a copy of that file into the stash, use:
 To decrypt a stashed file and drop it into the current directory, use:
 
 	stash grab <file>
+
+All stashed files and directories can be archived into a `.tar.gz` file with:
+```
+stash archive
+```
+This will replace everything in the stash with an encrypted tarball called `contents`.
 
 ## Project status
 
