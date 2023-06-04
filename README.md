@@ -49,16 +49,13 @@ So far we have completed these tasks:
 - Moved our core functions into a `Stash` struct that manages its own path.
 - Implemented and tested a bespoke key management system as a proof of concept. (Then scrapped it for Linux keyrings.)
 - Added initialization and authentication for `stash` Linux user.
+- Removed `init` command, added `archive` instead.
 
 Our next steps will be to:
 
 1. Use Linux keyrings to store key/nonce pairs for stashed files.
 2. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-3. Make error handling more descriptive and robust.
-4. Review and refactor for greater efficiency.
-5. Proceed to flex goals.
-
-## Flex goals
-
-1. Add `archive` and `unpack` commands.
-2. Support nested filepaths in the stash using optional `path` argument.
+3. Add `view` and `unpack` commands.
+4. Add `PAM` initialization to configure sessions and timeouts for `stash` user.
+5. Make error handling more descriptive and robust.
+6. Review and refactor for greater efficiency.

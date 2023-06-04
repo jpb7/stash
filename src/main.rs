@@ -29,8 +29,11 @@
 //!          Richard Duffy
 
 use stash::*;
-use std::process::{exit, Command, Stdio};
-use std::{env, io, path::Path};
+use std::{
+    env, io,
+    path::Path,
+    process::{exit, Command, Stdio},
+};
 
 const USAGE: &str = "usage: stash <command> [<args>]";
 
@@ -61,15 +64,14 @@ fn main() {
 
     //  Handle different commands and arguments
     match command.as_str() {
-        "init" => {
+        "list" => {
             if !arguments.is_empty() {
-                eprintln!("usage: stash init");
+                eprintln!("usage: stash list");
                 return;
             }
-            //  TODO: probably don't need this anymore
-            //  Create new stash at `~/.stash`
-            match stash.init() {
-                Ok(_) => println!("New stash initialized"),
+            //  Display contents of stash
+            match stash.list() {
+                Ok(contents) => println!("{}", contents),
                 Err(err) => eprintln!("{}", err),
             }
         }
@@ -84,17 +86,6 @@ fn main() {
             match stash.add(file) {
                 Ok(_) => println!("File added successfully"),
                 Err(err) => println!("{}", err),
-            }
-        }
-        "list" => {
-            if !arguments.is_empty() {
-                eprintln!("usage: stash list");
-                return;
-            }
-            //  Display contents of stash
-            match stash.list() {
-                Ok(contents) => println!("{}", contents),
-                Err(err) => eprintln!("{}", err),
             }
         }
         "copy" => {
@@ -120,6 +111,17 @@ fn main() {
             //  Decrypt a file and move it to current directory
             match stash.grab(file) {
                 Ok(_) => println!("File grabbed successfully"),
+                Err(err) => eprintln!("{}", err),
+            }
+        }
+        "archive" => {
+            if !arguments.is_empty() {
+                eprintln!("usage: stash archive");
+                return;
+            }
+            //  Create `.tar.gz` of stash contents
+            match stash.archive() {
+                Ok(_) => println!("Stash contents archived"),
                 Err(err) => eprintln!("{}", err),
             }
         }
