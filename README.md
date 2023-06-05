@@ -2,9 +2,9 @@
 
 ## Project vision
 
-`stash` is a command-line tool that allows the user to create and manage an encrypted folder on their local Linux filesystem. The idea is to add an extra layer of privacy and security for sensitive files or values such as API keys.
+`stash` is a Linux command-line tool that allows the user to create and manage a directory of encrypted files. The idea is to add an extra layer of privacy and security for sensitive files.
 
-Basically, `stash` provides a set of terminal commands that allow the user to quickly encrypt a given file or set of files into an encrypted folder (called the stash), and also to decrypt a file or files from the stash into the current directory.
+`stash` provides a few simple commands which allow the user to move files into and out of a locked directory called the stash, encrypting or decrypting those files in the process.
 
 For encryption and decryption, `stash` uses the `aes-gcm` crate.
 
@@ -59,7 +59,7 @@ Our next steps will be to:
 
 1. Use Linux keyrings to store key/nonce pairs for stashed files.
 2. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-3. Add `view` and `unpack` commands.
+3. Add `view` and `unpack` commands to work with an archived stash.
 4. Add `PAM` initialization to configure sessions and timeouts for `stash` user.
 5. Make error handling more descriptive and robust.
 6. Review and refactor for greater efficiency.
