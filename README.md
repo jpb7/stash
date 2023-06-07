@@ -32,12 +32,18 @@ To decrypt a stashed file and drop it into the current directory, use:
 
 	stash grab <file>
 
+To decrypt a copy of that stashed file instead, use:
+
+	stash use <file>
+
 All stashed files and directories can be archived into a `.tar.gz` file with:
 ```
 stash archive
 ```
-This will replace everything in the stash with an encrypted tarball called `contents`.
-
+This will replace everything in the stash with an encrypted tarball called `contents`. To unpack that tarball, use:
+```
+stash unpack
+```
 ## Project status
 
 So far we have completed these tasks:
@@ -54,12 +60,14 @@ So far we have completed these tasks:
 - Implemented and tested a bespoke key management system as a proof of concept. (Then scrapped it for Linux keyrings.)
 - Added initialization and authentication for `stash` Linux user.
 - Removed `init` command, added `archive` instead.
+- Added Linux keyrings support for managing key/nonce pairs.
+- Added the `unpack` command.
 
 Our next steps will be to:
 
-1. Use Linux keyrings to store key/nonce pairs for stashed files.
-2. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-3. Add `view` and `unpack` commands to work with an archived stash.
-4. Add `PAM` initialization to configure sessions and timeouts for `stash` user.
-5. Make error handling more descriptive and robust.
-6. Review and refactor for greater efficiency.
+1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
+2. Add `remove` command (to ensure Linux key is invalidated, which doesn't happen with `su stash && rm <file>`)
+3. Add `PAM` initialization to configure sessions and timeouts for `stash` user.
+4. Make error handling more descriptive and robust.
+5. Review and refactor for greater efficiency.
+

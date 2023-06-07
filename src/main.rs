@@ -114,6 +114,19 @@ fn main() {
                 Err(err) => eprintln!("{}", err),
             }
         }
+        "use" => {
+            if arguments.len() != 1 {
+                eprintln!("usage: stash use <file>");
+                return;
+            }
+            let file = &arguments[0];
+
+            //  Decrypt a file and copy it to current directory
+            match stash.r#use(file) {
+                Ok(_) => println!("File copied successfully"),
+                Err(err) => eprintln!("{}", err),
+            }
+        }
         "archive" => {
             if !arguments.is_empty() {
                 eprintln!("usage: stash archive");
@@ -122,6 +135,17 @@ fn main() {
             //  Create `.tar.gz` of stash contents
             match stash.archive() {
                 Ok(_) => println!("Stash contents archived"),
+                Err(err) => eprintln!("{}", err),
+            }
+        }
+        "unpack" => {
+            if !arguments.is_empty() {
+                eprintln!("usage: stash unpack");
+                return;
+            }
+            //  Create `.tar.gz` of stash contents
+            match stash.unpack() {
+                Ok(_) => println!("Stash archive unpacked"),
                 Err(err) => eprintln!("{}", err),
             }
         }

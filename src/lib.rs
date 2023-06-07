@@ -5,18 +5,32 @@ use aes_gcm::{
     aead::{AeadCore, AeadInPlace, KeyInit, OsRng},
     Aes256Gcm,
 };
+use linux_keyutils::{KeyRing, KeyRingIdentifier};
+use std::io::{self, Read, Seek, Write};
 use std::{
     env, fs,
     io::{self, Read, Seek, Write},
     path::{Path, PathBuf},
+    process::Command,
 };
 #[cfg(test)]
 use tempfile::TempDir;
+use zeroize::Zeroize;
+
+//  TODO: find a way to test this
+macro_rules! zeroize_all {
+    ($($arg:expr),*) => {
+        $(
+            $arg.zeroize();
+        )*
+    };
+}
 
 #[derive(Debug, Clone)]
 pub struct Stash {
     path: PathBuf,
     contents: PathBuf,
+    keyring: KeyRing, // TODO: confirm permissions on this
 }
 
 // Call `new()` for default implementation
@@ -32,10 +46,12 @@ impl Stash {
         let home = env::var("HOME").expect("Failed to get `HOME` environment variable");
         let stash_path = PathBuf::from(&home);
         let contents_path = stash_path.join("contents");
+        let session_keyring = KeyRing::from_special_id(KeyRingIdentifier::Session, false).unwrap();
 
         Stash {
             path: stash_path,
             contents: contents_path,
+            keyring: session_keyring,
         }
     }
 
@@ -72,8 +88,6 @@ impl Stash {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
-        //  TODO: this will need to decrypt the `contents` file
-        //  TODO: it will then need to run some form of `tar -t` instead
         let ls_output = std::process::Command::new("ls")
             .arg(self.path.to_str().unwrap())
             .output()
@@ -94,17 +108,16 @@ impl Stash {
         let dst_path = self.path.join(src_path.file_name().unwrap());
         fs::rename(src_path, &dst_path).unwrap();
 
-        let file_key = Aes256Gcm::generate_key(OsRng);
-        let nonce = Aes256Gcm::generate_nonce(OsRng);
+        let mut file_key = Aes256Gcm::generate_key(OsRng);
+        let mut nonce = Aes256Gcm::generate_nonce(OsRng);
 
         Self::encrypt(&dst_path, &file_key, &nonce)?;
-        //  For testing that decryption works
-        //Self::decrypt(&dst_path, &file_key, &nonce)?;
 
-        //  TODO: decrypt `contents` file (tarball) using `stash_key`
-        //  TODO: unpack decrypted tarball
-        //  TODO: create new tarball of stash contents
-        //  TODO: re-encrypt `contents` using `stash_key`
+        let description = src_path.to_str().unwrap();
+        let mut secret = Self::join_key_and_nonce(file_key.as_ref(), nonce.as_ref());
+        self.keyring.add_key(description, &secret).unwrap();
+
+        zeroize_all!(file_key, nonce, secret);
 
         Ok(())
     }
@@ -116,15 +129,18 @@ impl Stash {
         }
         let src_path = Path::new(file);
         let dst_path = self.path.join(src_path.file_name().unwrap());
-        fs::copy(src_path, dst_path).unwrap();
+        fs::copy(src_path, &dst_path).unwrap();
 
-        let file_key = Aes256Gcm::generate_key(OsRng);
-        let nonce = Aes256Gcm::generate_nonce(OsRng);
+        let mut file_key = Aes256Gcm::generate_key(OsRng);
+        let mut nonce = Aes256Gcm::generate_nonce(OsRng);
 
-        //  TODO: decrypt `contents` file (tarball) using `stash_key`
-        //  TODO: unpack decrypted tarball
-        //  TODO: create new tarball of stash contents
-        //  TODO: re-encrypt `contents` using `stash_key`
+        Self::encrypt(&dst_path, &file_key, &nonce)?;
+
+        let description = src_path.to_str().unwrap();
+        let mut secret = Self::join_key_and_nonce(file_key.as_ref(), nonce.as_ref());
+        self.keyring.add_key(description, &secret).unwrap();
+
+        zeroize_all!(file_key, nonce, secret);
 
         Ok(())
     }
@@ -134,27 +150,79 @@ impl Stash {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
+        let sys_key = self.keyring.search(file).unwrap();
+        let (mut file_key, mut nonce) = Self::split_secret(&sys_key.read_to_vec().unwrap());
+
         let src_path = self.path.join(file);
+        Self::decrypt(&src_path, &file_key, &nonce).unwrap();
+
         let dst_path = env::current_dir()?.join(file);
         fs::rename(src_path, dst_path)?;
+
+        sys_key.invalidate().unwrap();
+        //Self::zeroize_key(secret);
+        zeroize_all!(file_key, nonce);
 
         Ok(())
     }
 
-    //  Create a tarball from current stash contents.
+    //  Copy `file` from stash into current directory
+    pub fn r#use(&self, file: &str) -> io::Result<()> {
+        if !self.path.exists() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+        }
+        let sys_key = self.keyring.search(file).unwrap();
+        let (mut file_key, mut nonce) = Self::split_secret(&sys_key.read_to_vec().unwrap());
+
+        let src_path = self.path.join(file);
+        let dst_path = env::current_dir()?.join(file);
+
+        fs::copy(src_path, &dst_path)?;
+        Self::decrypt(&dst_path, &file_key, &nonce).unwrap();
+
+        //Self::zeroize_key(sys_key);
+        zeroize_all!(file_key, nonce);
+
+        Ok(())
+    }
+
+    //  Create a tarball from current stash contents
     pub fn archive(&mut self) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
         self.create_tarball()?;
 
-        let stash_key = Aes256Gcm::generate_key(OsRng);
-        let nonce = Aes256Gcm::generate_nonce(OsRng);
-        Self::encrypt(&self.contents, &stash_key, &nonce)?;
-        //Self::decrypt(&self.contents, &stash_key, &nonce)?;
+        let mut file_key = Aes256Gcm::generate_key(OsRng);
+        let mut nonce = Aes256Gcm::generate_nonce(OsRng);
 
-        //  TODO: create keyring
-        //  TODO: store key/nonce on keyring
+        Self::encrypt(&self.contents, &file_key, &nonce)?;
+
+        let description = &self.contents.to_str().unwrap();
+        let mut secret = Self::join_key_and_nonce(file_key.as_ref(), nonce.as_ref());
+        self.keyring.add_key(description, &secret).unwrap();
+
+        zeroize_all!(file_key, nonce, secret);
+
+        Ok(())
+    }
+
+    //  Extract the `contents` file
+    pub fn unpack(&mut self) -> io::Result<()> {
+        if !self.path.exists() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+        }
+        let description = &self.contents.to_str().unwrap();
+        let sys_key = self.keyring.search(description).unwrap();
+        let (mut file_key, mut nonce) = Self::split_secret(&sys_key.read_to_vec().unwrap());
+
+        Self::decrypt(&self.contents, &file_key, &nonce).unwrap();
+        self.extract_tarball()?;
+        fs::remove_file(&self.contents)?;
+        sys_key.invalidate().unwrap();
+
+        //Self::zeroize_key(sys_key);
+        zeroize_all!(file_key, nonce);
 
         Ok(())
     }
@@ -173,8 +241,6 @@ impl Stash {
 
         file.seek(io::SeekFrom::Start(0))?;
         file.write_all(&buffer)?;
-
-        //  Truncate the file to the new size
         file.set_len(buffer.len() as u64)?;
 
         Ok(())
@@ -194,23 +260,16 @@ impl Stash {
 
         file.seek(io::SeekFrom::Start(0))?;
         file.write_all(&buffer)?;
-
-        //  Truncate the file to the new size
         file.set_len(buffer.len() as u64)?;
 
-        Ok(())
+        Ok(contents)
     }
 
     // Create a `.tar.gz` archive of stash contents
     fn create_tarball(&self) -> Result<(), io::Error> {
-        //  TODO: successfully create archive, then remove originals
-        let tar = std::process::Command::new("sh")
+        let tar = Command::new("sh")
             .arg("-c")
-            .arg(format!(
-                "tar czf {} --remove-files {}/*",
-                self.contents.display(),
-                self.path.display()
-            ))
+            .arg("cd && tar czf contents --remove-files ./*")
             .output()?;
 
         if !tar.status.success() {
@@ -224,4 +283,47 @@ impl Stash {
 
         Ok(())
     }
+
+    // Extract a `.tar.gz` of stash contents
+    fn extract_tarball(&self) -> Result<(), io::Error> {
+        let tar = Command::new("sh")
+            .arg("-c")
+            .arg("cd ~ && tar xzf contents")
+            .output()?;
+
+        if !tar.status.success() {
+            let err_msg = String::from_utf8_lossy(&tar.stderr);
+            eprintln!("{}", err_msg);
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to unpack tar archive: {}", err_msg),
+            ));
+        }
+
+        Ok(())
+    }
+
+    // Join `file_key` and `nonce` into single `secret` for storage.
+    fn join_key_and_nonce(file_key: &[u8], nonce: &[u8]) -> Vec<u8> {
+        let mut secret = Vec::with_capacity(file_key.len() + nonce.len());
+        secret.extend_from_slice(file_key);
+        secret.extend_from_slice(nonce);
+
+        secret
+    }
+
+    // Split a stored `secret` into `file_key` and `nonce`
+    fn split_secret(secret: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        let file_key = secret[..32].to_vec();
+        let nonce = secret[32..].to_vec();
+
+        (file_key, nonce)
+    }
+
+    // TODO: get this to work
+    /*
+    fn zeroize_key(key: &mut Key) {
+        key.0 = Default::default();
+    }
+    */
 }
