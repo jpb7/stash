@@ -6,7 +6,6 @@ use aes_gcm::{
     Aes256Gcm,
 };
 use linux_keyutils::{KeyRing, KeyRingIdentifier};
-use std::io::{self, Read, Seek, Write};
 use std::{
     env, fs,
     io::{self, Read, Seek, Write},
@@ -262,7 +261,7 @@ impl Stash {
         file.write_all(&buffer)?;
         file.set_len(buffer.len() as u64)?;
 
-        Ok(contents)
+        Ok(())
     }
 
     // Create a `.tar.gz` archive of stash contents
