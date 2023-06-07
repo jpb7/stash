@@ -1,6 +1,3 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-
 use aes_gcm::{
     aead::{AeadCore, AeadInPlace, KeyInit, OsRng},
     Aes256Gcm,
