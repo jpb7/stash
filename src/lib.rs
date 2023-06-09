@@ -182,6 +182,22 @@ impl Stash {
         Ok(())
     }
 
+    //  Delete `file` in stash
+    pub fn delete(&self, file: &str) -> io::Result<()> {
+        if !self.path.exists() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+        }
+        let target_path = self.path.join(file);
+        fs::remove_file(target_path.to_str().unwrap())?;
+
+        let sys_key = self.keyring.search(file).unwrap();
+        sys_key.invalidate().unwrap();
+
+        //Self::zeroize_key(secret);
+
+        Ok(())
+    }
+
     //  Create a tarball from current stash contents
     pub fn archive(&mut self) -> io::Result<()> {
         if !self.path.exists() {

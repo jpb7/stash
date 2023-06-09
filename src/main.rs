@@ -127,6 +127,19 @@ fn main() {
                 Err(err) => eprintln!("{}", err),
             }
         }
+        "delete" => {
+            if arguments.len() != 1 {
+                eprintln!("usage: stash delete <file>");
+                return;
+            }
+            let file = &arguments[0];
+
+            //  Delete a file in the stash
+            match stash.delete(file) {
+                Ok(_) => println!("File deleted"),
+                Err(err) => eprintln!("{}", err),
+            }
+        }
         "archive" => {
             if !arguments.is_empty() {
                 eprintln!("usage: stash archive");

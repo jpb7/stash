@@ -36,6 +36,10 @@ To decrypt a copy of that stashed file instead, use:
 
 	stash use <file>
 
+To delete a stashed file, use:
+
+	stash delete <file>
+
 All stashed files and directories can be archived into a `.tar.gz` file with:
 ```
 stash archive
