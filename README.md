@@ -34,7 +34,7 @@ To decrypt a stashed file and drop it into the current directory, use:
 
 To decrypt a copy of that stashed file instead, use:
 
-	stash use <file>
+	stash borrow <file>
 
 To delete a stashed file, use:
 
@@ -65,13 +65,17 @@ So far we have completed these tasks:
 - Added initialization and authentication for `stash` Linux user.
 - Removed `init` command, added `archive` instead.
 - Added Linux keyrings support for managing key/nonce pairs.
-- Added the `unpack` command.
+- Added the `unpack` command for un-archiving.
+- Added the `borrow` command for copying files out of the stash.
 
 Our next steps will be to:
 
 1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-2. Add `remove` command (to ensure Linux key is invalidated, which doesn't happen with `su stash && rm <file>`)
-3. Add `PAM` initialization to configure sessions and timeouts for `stash` user.
+2. Fix issues with key persistence across sessions.
+3. Implement a `sudo`-style login timeout to avoid repeated password entry.
 4. Make error handling more descriptive and robust.
 5. Review and refactor for greater efficiency.
 
+Flex goal:
+
+- Expand archiving behavior.
