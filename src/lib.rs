@@ -163,7 +163,7 @@ impl Stash {
     }
 
     //  Copy `file` from stash into current directory
-    pub fn r#use(&self, file: &str) -> io::Result<()> {
+    pub fn borrow(&self, file: &str) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
@@ -190,8 +190,8 @@ impl Stash {
         let target_path = self.path.join(file);
         fs::remove_file(target_path.to_str().unwrap())?;
 
-        let sys_key = self.keyring.search(file).unwrap();
-        sys_key.invalidate().unwrap();
+        //let sys_key = self.keyring.search(file).unwrap();
+        //sys_key.invalidate().unwrap();
 
         //Self::zeroize_key(secret);
 

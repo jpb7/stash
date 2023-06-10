@@ -5,22 +5,25 @@
 //! Usage: stash <command> [<args>]
 //!
 //! Available commands:
-//!   - init: Create a new stash at `~/.stash`.
 //!   - list: List the contents of the stash.
+//!   - archive: Create a compressed tarball from stash contents.
+//!   - unpack: Unpack archive of stash contents.
 //!   - add <file>: Encrypt a file and add it to the stash.
 //!   - copy <file>: Encrypt a file and copy it into the stash.
 //!   - grab <file>: Decrypt a file from the stash and drop it in the current directory.
-//!
-//! Note: This utility assumes that the stash has been previously initialized.
-//! If not, use the `init` command to create a new stash before using other commands.
+//!   - borrow <file>: Decrypt a copy of a stashed file.
+//!   - delete <file>: Remove a stashed file from the system.
 //!
 //! Example usage:
 //! ```shell
-//! $ stash init
 //! $ stash list
+//! $ stash archive
+//! $ stash unpack
 //! $ stash add secret_file.txt
 //! $ stash copy secret_file.txt
 //! $ stash grab secret_file.txt
+//! $ stash borrow secret_file.txt
+//! $ stash delete secret_file.txt
 //! ```
 //!
 //! For more information, refer to the documentation of each command and its respective functions.
@@ -114,15 +117,15 @@ fn main() {
                 Err(err) => eprintln!("{}", err),
             }
         }
-        "use" => {
+        "borrow" => {
             if arguments.len() != 1 {
-                eprintln!("usage: stash use <file>");
+                eprintln!("usage: stash borrow <file>");
                 return;
             }
             let file = &arguments[0];
 
             //  Decrypt a file and copy it to current directory
-            match stash.r#use(file) {
+            match stash.borrow(file) {
                 Ok(_) => println!("File copied successfully"),
                 Err(err) => eprintln!("{}", err),
             }
