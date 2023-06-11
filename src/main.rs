@@ -54,7 +54,6 @@ fn main() {
     if !user_exists(stash_user) {
         create_user(&current_user, stash_user);
     }
-    //  TODO: use timeout to prevent re-entering password again
     if current_user != stash_user {
         run_as_stash(stash_user, args).expect("Failed to execute as stash user");
         exit(0);
@@ -219,23 +218,18 @@ fn create_user(existing_user: &str, stash_user: &str) {
         eprintln!("Error setting password for user {}", stash_user);
         exit(1);
     }
-    //  End `sudo` session
-    Command::new("sudo")
-        .arg("-k")
-        .status()
-        .expect("Failed to manually terminate sudo session");
 }
 
 //  Log in as `stash` user and re-execute the program with same `args`.
 fn run_as_stash(stash_user: &str, args: Vec<String>) -> Result<(), io::Error> {
     let current_exe = env::current_exe().expect("Failed to get current executable path");
+    let mut command = Command::new("sudo");
 
-    Command::new("su")
-        .arg(stash_user)
-        .arg("-c")
-        .arg(format!("{} {}", current_exe.display(), args.join(" ")))
-        .status()
-        .expect("Failed to execute program as stash user");
+    command.arg("-u").arg(stash_user).arg(current_exe);
+    for arg in args {
+        command.arg(arg);
+    }
+    command.status().expect("Failed to execute as stash user");
 
     Ok(())
 }

@@ -67,14 +67,14 @@ So far we have completed these tasks:
 - Added Linux keyrings support for managing key/nonce pairs.
 - Added the `unpack` command for un-archiving.
 - Added the `borrow` command for copying files out of the stash.
+- Switched to `sudo` for authentication to avoid repeated password re-entry.
 
 Our next steps will be to:
 
 1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
 2. Fix issues with key persistence across sessions.
-3. Implement a `sudo`-style login timeout to avoid repeated password entry.
-4. Make error handling more descriptive and robust.
-5. Review and refactor for greater efficiency.
+3. Make error handling more descriptive and robust.
+4. Review and refactor for greater efficiency.
 
 Flex goal:
 
