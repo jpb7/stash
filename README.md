@@ -6,7 +6,7 @@
 
 `stash` provides a few simple commands which allow the user to move files into and out of a locked directory called the stash, encrypting or decrypting those files in the process.
 
-For encryption and decryption, `stash` uses the `aes-gcm` crate.
+For encryption and decryption, `stash` uses the `aes-gcm` crate. It uses the `sled` and `linux-keyutils` crates for persistent secret storage and caching, respectively.
 
 ## Usage
 
@@ -68,14 +68,16 @@ So far we have completed these tasks:
 - Added the `unpack` command for un-archiving.
 - Added the `borrow` command for copying files out of the stash.
 - Switched to `sudo` for authentication to avoid repeated password re-entry.
+- Switched to `sled` database for secret storage.
+- Added Linux keys again to cache secrets, avoid disk I/O.
 
 Our next steps will be to:
 
 1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-2. Fix issues with key persistence across sessions.
-3. Make error handling more descriptive and robust.
-4. Review and refactor for greater efficiency.
+2. Make error handling more descriptive and robust.
+3. Review and refactor for greater efficiency.
+4. Add doc comments and prepare repo for project submission.
 
 Flex goal:
 
-- Expand archiving behavior.
+- Implement automatic, session-based encryption/decryption of database.

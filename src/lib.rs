@@ -1,8 +1,12 @@
+#![allow(dead_code)] // keyring and secret
+
 use aes_gcm::{
-    aead::{AeadCore, AeadInPlace, KeyInit, OsRng},
+    aead::{generic_array::GenericArray, AeadCore, AeadInPlace, KeyInit, OsRng},
     Aes256Gcm,
 };
 use linux_keyutils::{KeyRing, KeyRingIdentifier};
+use serde_derive::{self, Deserialize, Serialize};
+use sled::{self, Config, Db};
 use std::{
     env, fs,
     io::{self, Read, Seek, Write},
@@ -11,9 +15,10 @@ use std::{
 };
 #[cfg(test)]
 use tempfile::TempDir;
-use zeroize::Zeroize;
+//use zeroize::Zeroize;
 
 //  TODO: find a way to test this
+#[allow(unused_macros)]
 macro_rules! zeroize_all {
     ($($arg:expr),*) => {
         $(
@@ -22,34 +27,107 @@ macro_rules! zeroize_all {
     };
 }
 
+//  TODO: zeroize on drop
+//  TODO: add comments
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct Secret {
+    key: Vec<u8>,
+    nonce: Vec<u8>,
+}
+impl Secret {
+    fn new() -> Self {
+        Secret {
+            key: Aes256Gcm::generate_key(OsRng).to_vec(),
+            nonce: Aes256Gcm::generate_nonce(OsRng).to_vec(),
+        }
+    }
+    fn from(secret: &[u8]) -> Self {
+        Secret {
+            key: secret[..32].to_vec(),
+            nonce: secret[32..].to_vec(),
+        }
+    }
+    fn join(&self) -> Vec<u8> {
+        let mut secret = Vec::with_capacity(self.key.len() + self.nonce.len());
+        secret.extend_from_slice(&self.key);
+        secret.extend_from_slice(&self.nonce);
+
+        secret
+    }
+    fn split(&self) -> (Vec<u8>, Vec<u8>) {
+        (self.key.clone(), self.nonce.clone())
+    }
+}
+
+//  TODO: zeroize on drop
 #[derive(Debug, Clone)]
 pub struct Stash {
     path: PathBuf,
     contents: PathBuf,
-    keyring: KeyRing, // TODO: confirm permissions on this
+    keyring: KeyRing,
+    //secret: Secret,
+    db: Db,
 }
-
-// Call `new()` for default implementation
 impl Default for Stash {
     fn default() -> Self {
         Self::new()
     }
 }
-
 impl Stash {
-    //  Initialize paths at `~/.stash` and `~/.stash/contents`
     pub fn new() -> Self {
         let home = env::var("HOME").expect("Failed to get `HOME` environment variable");
-        let stash_path = PathBuf::from(&home);
-        let contents_path = stash_path.join("contents");
-        let session_keyring = KeyRing::from_special_id(KeyRingIdentifier::Session, false).unwrap();
+        let path = PathBuf::from(&home);
+
+        let contents = path.join("contents");
+        //let secret_path = path.join(".secret");
+        let db_path = path.join(".db");
+
+        //  TODO: set up session-based encryption/decryption
+        let keyring = KeyRing::from_special_id(KeyRingIdentifier::Session, false).unwrap();
+        //let secret = Self::get_secret(&secret_path);
+        let db = Self::get_db(&db_path);
 
         Stash {
-            path: stash_path,
-            contents: contents_path,
-            keyring: session_keyring,
+            path,
+            contents,
+            keyring,
+            //secret,
+            db,
         }
     }
+
+    // Open `sled` database if it exists; otherwise create it
+    fn get_db(db_path: &Path) -> Db {
+        if db_path.exists() {
+            sled::open(db_path.to_str().unwrap()).unwrap()
+        } else {
+            let config = Config::new().path(db_path.to_str().unwrap());
+            config.open().unwrap()
+        }
+    }
+
+    /*  TODO: set up session-based encryption/decryption
+    // Read stash-level secrets from hidden file
+    fn get_secret(secrets: &Path) -> Secret {
+        let mut secrets_file;
+        let mut secrets_raw = Vec::new();
+
+        if !secrets.exists() {
+            let secret = Secret::new();
+            secrets_file = fs::File::create(secrets).expect("Failed to create secrets file");
+            secrets_file
+                .write_all(&secret.join())
+                .expect("Failed to write stash key");
+            secret
+        } else {
+            secrets_file = fs::File::open(secrets).expect("Failed to open secrets file");
+            secrets_file
+                .read_to_end(&mut secrets_raw)
+                .expect("Failed to retrieve stash secrets");
+            Secret::from(&secrets_raw)
+        }
+    }
+    */
 
     // Return current value of stash path
     #[cfg(test)]
@@ -92,108 +170,159 @@ impl Stash {
 
         let contents = String::from_utf8_lossy(&ls_output).trim().to_string();
 
+        /*
+        println!("\n{:?}", self.keyring.get_links(64 as usize).unwrap());
+        for key in self.db.iter().keys() {
+            println!("Key in database: {:?}", String::from_utf8_lossy(&key?));
+        }
+        */
+
         Ok(contents)
     }
 
     //  Add `file` to stash
-    pub fn add(&self, file: &str) -> io::Result<()> {
+    pub fn add(&mut self, file: &str) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
         let src_path = Path::new(file);
         let dst_path = self.path.join(src_path.file_name().unwrap());
+
+        if dst_path.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "File is already in stash",
+            ));
+        }
+        let secret = Secret::new();
+        let description = src_path.to_string_lossy().to_string();
+
         fs::rename(src_path, &dst_path).unwrap();
-
-        let mut file_key = Aes256Gcm::generate_key(OsRng);
-        let mut nonce = Aes256Gcm::generate_nonce(OsRng);
-
-        Self::encrypt(&dst_path, &file_key, &nonce)?;
-
-        let description = src_path.to_str().unwrap();
-        let mut secret = Self::join_key_and_nonce(file_key.as_ref(), nonce.as_ref());
-        self.keyring.add_key(description, &secret).unwrap();
-
-        zeroize_all!(file_key, nonce, secret);
+        Self::encrypt(&dst_path, &secret).unwrap();
+        self.db
+            .insert(description.as_bytes(), secret.join())
+            .unwrap();
+        self.keyring.add_key(&description, &secret.join()).unwrap();
+        //zeroize_all!(src_path, dst_path, secret, description, key);
 
         Ok(())
     }
 
     //  Copy `file` into stash
-    pub fn copy(&self, file: &str) -> io::Result<()> {
+    pub fn copy(&mut self, file: &str) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
         let src_path = Path::new(file);
         let dst_path = self.path.join(src_path.file_name().unwrap());
+
+        if dst_path.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "File is already in stash",
+            ));
+        }
+        let secret = Secret::new();
+        let description = src_path.to_string_lossy().to_string();
+
         fs::copy(src_path, &dst_path).unwrap();
-
-        let mut file_key = Aes256Gcm::generate_key(OsRng);
-        let mut nonce = Aes256Gcm::generate_nonce(OsRng);
-
-        Self::encrypt(&dst_path, &file_key, &nonce)?;
-
-        let description = src_path.to_str().unwrap();
-        let mut secret = Self::join_key_and_nonce(file_key.as_ref(), nonce.as_ref());
-        self.keyring.add_key(description, &secret).unwrap();
-
-        zeroize_all!(file_key, nonce, secret);
+        Self::encrypt(&dst_path, &secret)?;
+        self.db
+            .insert(description.as_bytes(), secret.join())
+            .unwrap();
+        self.keyring.add_key(&description, &secret.join()).unwrap();
+        //zeroize_all!(src_path, dst_path, secret, description, key);
 
         Ok(())
     }
 
     //  Move `file` from stash into current directory
-    pub fn grab(&self, file: &str) -> io::Result<()> {
+    pub fn grab(&mut self, file: &str) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
-        let sys_key = self.keyring.search(file).unwrap();
-        let (mut file_key, mut nonce) = Self::split_secret(&sys_key.read_to_vec().unwrap());
-
         let src_path = self.path.join(file);
-        Self::decrypt(&src_path, &file_key, &nonce).unwrap();
-
         let dst_path = env::current_dir()?.join(file);
-        fs::rename(src_path, dst_path)?;
+        let secret;
 
-        sys_key.invalidate().unwrap();
-        //Self::zeroize_key(secret);
-        zeroize_all!(file_key, nonce);
+        if dst_path.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "File already exists in current directory",
+            ));
+        }
+        //  Get secret from sys key if it exists; otherwise, use db
+        if let Ok(key) = self.keyring.search(file) {
+            secret = Secret::from(&key.read_to_vec().unwrap());
+            key.invalidate().unwrap();
+            //key.zeroize();
+        } else if let Some(value) = self.db.get(file)? {
+            secret = Secret::from(&value);
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Secret not found in stash",
+            ));
+        }
+        Self::decrypt(&src_path, &secret).unwrap();
+        fs::rename(src_path, dst_path)?;
+        self.db.remove(file)?;
+        //zeroize_all!(src_path, dst_path, secret);
 
         Ok(())
     }
 
     //  Copy `file` from stash into current directory
-    pub fn borrow(&self, file: &str) -> io::Result<()> {
+    pub fn borrow(&mut self, file: &str) -> io::Result<()> {
         if !self.path.exists() {
-            return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "No stash found",
+            ));
         }
-        let sys_key = self.keyring.search(file).unwrap();
-        let (mut file_key, mut nonce) = Self::split_secret(&sys_key.read_to_vec().unwrap());
-
         let src_path = self.path.join(file);
         let dst_path = env::current_dir()?.join(file);
+        let secret;
 
-        fs::copy(src_path, &dst_path)?;
-        Self::decrypt(&dst_path, &file_key, &nonce).unwrap();
-
-        //Self::zeroize_key(sys_key);
-        zeroize_all!(file_key, nonce);
+        if dst_path.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "File already exists in current directory",
+            ));
+        }
+        //  Get secret from sys key if it exists; otherwise, use db
+        if let Ok(key) = self.keyring.search(file) {
+            secret = Secret::from(&key.read_to_vec().unwrap());
+        } else if let Some(value) = self.db.get(file)? {
+            secret = Secret::from(&value);
+            self.keyring.add_key(file, &secret.join()).unwrap();
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Secret not found in stash",
+            ));
+        }
+        Self::decrypt(&src_path, &secret).unwrap();
+        fs::copy(src_path, dst_path)?;
+        //zeroize_all!(src_path, dst_path, secret);
 
         Ok(())
     }
 
+    //  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //  TODO: should refuse to delete `.secret` and `.db`
+    //  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     //  Delete `file` in stash
-    pub fn delete(&self, file: &str) -> io::Result<()> {
+    pub fn delete(&mut self, file: &str) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
         }
         let target_path = self.path.join(file);
         fs::remove_file(target_path.to_str().unwrap())?;
-
-        //let sys_key = self.keyring.search(file).unwrap();
-        //sys_key.invalidate().unwrap();
-
-        //Self::zeroize_key(secret);
+        self.db.remove(file)?;
+        if let Ok(key) = self.keyring.search(file) {
+            key.invalidate().unwrap();
+        }
 
         Ok(())
     }
@@ -202,19 +331,23 @@ impl Stash {
     pub fn archive(&mut self) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+        } else if self.contents.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "Archive already exists",
+            ));
         }
+        //  TODO: use "contents" only, not full path
+        let description = self.contents.to_string_lossy().to_string();
+        let secret = Secret::new();
+
         self.create_tarball()?;
-
-        let mut file_key = Aes256Gcm::generate_key(OsRng);
-        let mut nonce = Aes256Gcm::generate_nonce(OsRng);
-
-        Self::encrypt(&self.contents, &file_key, &nonce)?;
-
-        let description = &self.contents.to_str().unwrap();
-        let mut secret = Self::join_key_and_nonce(file_key.as_ref(), nonce.as_ref());
-        self.keyring.add_key(description, &secret).unwrap();
-
-        zeroize_all!(file_key, nonce, secret);
+        Self::encrypt(&self.contents, &secret)?;
+        self.db
+            .insert(description.as_bytes(), secret.join())
+            .unwrap();
+        self.keyring.add_key(&description, &secret.join()).unwrap();
+        //zeroize_all!(description, secret);
 
         Ok(())
     }
@@ -223,32 +356,48 @@ impl Stash {
     pub fn unpack(&mut self) -> io::Result<()> {
         if !self.path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, "No stash found"));
+        } else if !self.contents.exists() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "No archive to unpack",
+            ));
         }
-        let description = &self.contents.to_str().unwrap();
-        let sys_key = self.keyring.search(description).unwrap();
-        let (mut file_key, mut nonce) = Self::split_secret(&sys_key.read_to_vec().unwrap());
+        //  TODO: change this to filename only, not full path
+        let tarball = &self.contents.to_str().unwrap();
+        let secret;
 
-        Self::decrypt(&self.contents, &file_key, &nonce).unwrap();
+        if let Ok(key) = self.keyring.search(tarball) {
+            secret = Secret::from(&key.read_to_vec().unwrap());
+            key.invalidate().unwrap();
+            //key.zeroize();
+        } else if let Some(value) = self.db.get(tarball)? {
+            secret = Secret::from(&value);
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Secret not found in stash",
+            ));
+        }
+        Self::decrypt(&self.contents, &secret).unwrap();
         self.extract_tarball()?;
         fs::remove_file(&self.contents)?;
-        sys_key.invalidate().unwrap();
-
-        //Self::zeroize_key(sys_key);
-        zeroize_all!(file_key, nonce);
+        self.db.remove(tarball)?;
+        //zeroize_all!(tarball, secret);
 
         Ok(())
     }
 
     // Encrypt a specified file in place
-    fn encrypt(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
+    fn encrypt(path: &Path, secret: &Secret) -> io::Result<()> {
         let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+        let (key, nonce) = secret.split();
         let mut buffer = Vec::new();
 
         file.read_to_end(&mut buffer)?;
 
-        let cipher = Aes256Gcm::new(key.into());
+        let cipher = Aes256Gcm::new(GenericArray::from_slice(&key));
         cipher
-            .encrypt_in_place(nonce.into(), b"", &mut buffer)
+            .encrypt_in_place(GenericArray::from_slice(&nonce), b"", &mut buffer)
             .unwrap();
 
         file.seek(io::SeekFrom::Start(0))?;
@@ -259,15 +408,16 @@ impl Stash {
     }
 
     // Decrypt a file in place
-    fn decrypt(path: &Path, key: &[u8], nonce: &[u8]) -> io::Result<()> {
+    fn decrypt(path: &Path, secret: &Secret) -> io::Result<()> {
         let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+        let (key, nonce) = secret.split();
         let mut buffer = Vec::new();
 
         file.read_to_end(&mut buffer)?;
 
-        let cipher = Aes256Gcm::new(key.into());
+        let cipher = Aes256Gcm::new(GenericArray::from_slice(&key));
         cipher
-            .decrypt_in_place(nonce.into(), b"", &mut buffer)
+            .decrypt_in_place(GenericArray::from_slice(&nonce), b"", &mut buffer)
             .unwrap();
 
         file.seek(io::SeekFrom::Start(0))?;
@@ -314,28 +464,4 @@ impl Stash {
 
         Ok(())
     }
-
-    // Join `file_key` and `nonce` into single `secret` for storage.
-    fn join_key_and_nonce(file_key: &[u8], nonce: &[u8]) -> Vec<u8> {
-        let mut secret = Vec::with_capacity(file_key.len() + nonce.len());
-        secret.extend_from_slice(file_key);
-        secret.extend_from_slice(nonce);
-
-        secret
-    }
-
-    // Split a stored `secret` into `file_key` and `nonce`
-    fn split_secret(secret: &[u8]) -> (Vec<u8>, Vec<u8>) {
-        let file_key = secret[..32].to_vec();
-        let nonce = secret[32..].to_vec();
-
-        (file_key, nonce)
-    }
-
-    // TODO: get this to work
-    /*
-    fn zeroize_key(key: &mut Key) {
-        key.0 = Default::default();
-    }
-    */
 }
