@@ -5,25 +5,23 @@
 //! Usage: stash <command> [<args>]
 //!
 //! Available commands:
+//!   - add [-c] <file>: Encrypt a file and add it to the stash (optionally copy it).
+//!   - grab [-c] <file>: Decrypt a file from the stash and drop it in the current directory (optionally copy it).
+//!   - delete <file>: Delete a stashed file.
 //!   - list: List the contents of the stash.
 //!   - archive: Create a compressed tarball from stash contents.
 //!   - unpack: Unpack archive of stash contents.
-//!   - add <file>: Encrypt a file and add it to the stash.
-//!   - copy <file>: Encrypt a file and copy it into the stash.
-//!   - grab <file>: Decrypt a file from the stash and drop it in the current directory.
-//!   - borrow <file>: Decrypt a copy of a stashed file.
-//!   - delete <file>: Remove a stashed file from the system.
 //!
 //! Example usage:
 //! ```shell
+//! $ stash add secret_file.txt
+//! $ stash add -c secret_file.txt
+//! $ stash grab secret_file.txt
+//! $ stash grab -c secret_file.txt
+//! $ stash delete secret_file.txt
 //! $ stash list
 //! $ stash archive
 //! $ stash unpack
-//! $ stash add secret_file.txt
-//! $ stash copy secret_file.txt
-//! $ stash grab secret_file.txt
-//! $ stash borrow secret_file.txt
-//! $ stash delete secret_file.txt
 //! ```
 //!
 //! For more information, refer to the documentation of each command and its respective functions.
@@ -33,140 +31,174 @@
 
 use stash::*;
 use std::{
-    env, io,
+    env,
+    io::{self, Error, ErrorKind},
     path::Path,
     process::{exit, Command, Stdio},
 };
 
 const USAGE: &str = "usage: stash <command> [<args>]";
+const ERR: &str = "stash: error:";
 
 fn main() {
     //  Parse command line arguments
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.is_empty() {
-        println!("{}", USAGE);
-        return;
+    let cli_args: Vec<String> = std::env::args().skip(1).collect();
+    if cli_args.is_empty() {
+        eprintln!("{}", USAGE);
+        exit(1);
     }
+
     //  Authenticate as `stash` user
     let stash_user = "stash";
-    let current_user = env::var("USER").expect("Failed to retrieve current user");
+    let current_user = match env::var("USER") {
+        Ok(user) => user,
+        Err(_) => {
+            eprintln!("{} Failed to detect current user", ERR);
+            exit(1);
+        }
+    };
 
+    //  Create `stash` user if it doesn't exist
     if !user_exists(stash_user) {
-        create_user(&current_user, stash_user);
+        match create_user(&current_user, stash_user) {
+            Ok(_) => (),
+            Err(msg) => {
+                eprintln!("{} Failed to create `stash` user: {}", ERR, msg);
+                exit(1);
+            }
+        }
     }
+
+    //  Only execute `stash` operations as `stash` user
     if current_user != stash_user {
-        run_as_stash(stash_user, args).expect("Failed to execute as stash user");
-        exit(0);
+        match run_as_stash(stash_user, cli_args) {
+            Ok(_) => exit(0),
+            Err(msg) => {
+                eprintln!("Failed to run program as `stash` user: {}", msg);
+                exit(1);
+            }
+        }
     }
+
     //  Execute main program
-    let mut stash = Stash::new();
+    let mut stash = match Stash::new() {
+        Ok(stash) => stash,
+        Err(msg) => {
+            eprintln!("Failed to initialize `stash` object: {}", msg);
+            exit(1);
+        }
+    };
 
-    let command = &args[0];
-    let arguments = &args[1..];
+    let cmd = &cli_args[0];
+    let args = &cli_args[1..];
 
-    //  Handle different commands and arguments
-    match command.as_str() {
-        "list" => {
-            if !arguments.is_empty() {
-                eprintln!("usage: stash list");
+    //  Handle different commands and arguments from CLI
+    match cmd.as_str() {
+        "add" => {
+            if args.len() != 1 && args.len() != 2 {
+                eprintln!("usage: stash add [-c] <file>");
+                exit(1);
+            }
+            let (file, option) = match args.len() {
+                1 => (&args[0], false),
+                2 => {
+                    let flag = args[0] == "-c";
+                    (&args[1], flag)
+                }
+                _ => {
+                    eprintln!("{} Unable to parse arguments", ERR);
+                    exit(1);
+                }
+            };
+            //  Encrypt file and add it to stash
+            match stash.add(file, option) {
+                Ok(_) => {}
+                Err(msg) => eprintln!("{} {}", ERR, msg),
+            }
+        }
+        "grab" => {
+            if args.len() != 1 && args.len() != 2 {
+                eprintln!("usage: stash grab [-c] <file>");
                 return;
+            }
+            let (file, option) = match args.len() {
+                1 => (&args[0], false),
+                2 => {
+                    let flag = args[0] == "-c";
+                    (&args[1], flag)
+                }
+                _ => {
+                    eprintln!("{} Unable to parse arguments", ERR);
+                    exit(1);
+                }
+            };
+            //  Decrypt file and drop in current directory
+            match stash.grab(file, option) {
+                Ok(_) => {}
+                Err(msg) => eprintln!("{} {}", ERR, msg),
+            }
+        }
+        "delete" => {
+            if args.len() != 1 {
+                eprintln!("usage: stash delete <file>");
+                exit(1);
+            }
+            let file = &args[0];
+
+            //  Delete a file in the stash
+            match stash.delete(file) {
+                Ok(_) => {}
+                Err(msg) => {
+                    eprintln!("{} {}", ERR, msg);
+                    exit(1);
+                }
+            }
+        }
+        "list" => {
+            if !args.is_empty() {
+                eprintln!("usage: stash list");
+                exit(1);
             }
             //  Display contents of stash
             match stash.list() {
                 Ok(contents) => println!("{}", contents),
-                Err(err) => eprintln!("{}", err),
-            }
-        }
-        "add" => {
-            if arguments.len() != 1 {
-                eprintln!("usage: stash add <file>");
-                return;
-            }
-            let file = &arguments[0];
-
-            //  Encrypt file and add it to stash
-            match stash.add(file) {
-                Ok(_) => println!("File added successfully"),
-                Err(err) => println!("{}", err),
-            }
-        }
-        "copy" => {
-            if arguments.len() != 1 {
-                eprintln!("usage: stash copy <file>");
-                return;
-            }
-            let file = &arguments[0];
-
-            //  Encrypt file and copy it to stash
-            match stash.copy(file) {
-                Ok(_) => println!("File copied successfully"),
-                Err(err) => eprintln!("{}", err),
-            }
-        }
-        "grab" => {
-            if arguments.len() != 1 {
-                eprintln!("usage: stash grab <file>");
-                return;
-            }
-            let file = &arguments[0];
-
-            //  Decrypt a file and move it to current directory
-            match stash.grab(file) {
-                Ok(_) => println!("File grabbed successfully"),
-                Err(err) => eprintln!("{}", err),
-            }
-        }
-        "borrow" => {
-            if arguments.len() != 1 {
-                eprintln!("usage: stash borrow <file>");
-                return;
-            }
-            let file = &arguments[0];
-
-            //  Decrypt a file and copy it to current directory
-            match stash.borrow(file) {
-                Ok(_) => println!("File copied successfully"),
-                Err(err) => eprintln!("{}", err),
-            }
-        }
-        "delete" => {
-            if arguments.len() != 1 {
-                eprintln!("usage: stash delete <file>");
-                return;
-            }
-            let file = &arguments[0];
-
-            //  Delete a file in the stash
-            match stash.delete(file) {
-                Ok(_) => println!("File deleted"),
-                Err(err) => eprintln!("{}", err),
+                Err(msg) => {
+                    eprintln!("{} {}", ERR, msg);
+                    exit(1);
+                }
             }
         }
         "archive" => {
-            if !arguments.is_empty() {
+            if !args.is_empty() {
                 eprintln!("usage: stash archive");
-                return;
+                exit(1);
             }
             //  Create `.tar.gz` of stash contents
             match stash.archive() {
-                Ok(_) => println!("Stash contents archived"),
-                Err(err) => eprintln!("{}", err),
+                Ok(_) => {}
+                Err(msg) => {
+                    eprintln!("{} {}", ERR, msg);
+                    exit(1);
+                }
             }
         }
         "unpack" => {
-            if !arguments.is_empty() {
+            if !args.is_empty() {
                 eprintln!("usage: stash unpack");
-                return;
+                exit(1);
             }
-            //  Create `.tar.gz` of stash contents
+            //  Unpack `.tar.gz` of stash contents
             match stash.unpack() {
-                Ok(_) => println!("Stash archive unpacked"),
-                Err(err) => eprintln!("{}", err),
+                Ok(_) => {}
+                Err(msg) => {
+                    eprintln!("{} {}", ERR, msg);
+                    exit(1);
+                }
             }
         }
         _ => {
             eprintln!("{}", USAGE);
-            eprintln!("Unknown command: {}", command);
+            eprintln!("Unknown command: {}", cmd);
             exit(1);
         }
     }
@@ -174,19 +206,29 @@ fn main() {
 
 //  Return `true` if `user` exists on the local system
 fn user_exists(user: &str) -> bool {
-    Command::new("id")
+    let id = Command::new("id")
         .arg(user)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
+        .status();
+
+    match id {
+        Ok(status) => status.success(),
+        Err(err) => {
+            eprintln!("Failed to execute `id` command: {}", err);
+            false
+        }
+    }
 }
 
-//  TODO: add Result return type
 //  Create `stash` user with home directory at `/home/$USER/.stash`
-fn create_user(existing_user: &str, stash_user: &str) {
-    let user_home = env::var("HOME").expect("Failed to retrieve home directory");
+fn create_user(existing_user: &str, stash_user: &str) -> Result<(), Error> {
+    let user_home = env::var("HOME").map_err(|err| {
+        Error::new(
+            ErrorKind::Other,
+            format!("Failed to retrieve home directory: {}", err),
+        )
+    })?;
     let stash_path = Path::new(&user_home).join(".stash");
 
     //  Create `stash` user
@@ -201,35 +243,71 @@ fn create_user(existing_user: &str, stash_user: &str) {
             stash_user,
         ])
         .output()
-        .expect("Failed to create user");
+        .map_err(|err| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Failed to execute `useradd` command: {}", err),
+            )
+        })?;
 
     if !useradd.status.success() {
-        let err_msg = String::from_utf8_lossy(&useradd.stderr);
-        eprintln!("Error creating user: {}", err_msg);
-        exit(1);
+        let err = String::from_utf8_lossy(&useradd.stderr);
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("Error creating user: {}", err),
+        ));
     }
+
     //  Set password for `stash` user
     let passwd = Command::new("sudo")
         .args(["passwd", stash_user])
         .status()
-        .expect("Failed to execute sudo");
+        .map_err(|err| {
+            Error::new(
+                ErrorKind::Other,
+                format!("Failed to execute 'passwd': {}", err),
+            )
+        })?;
 
     if !passwd.success() {
-        eprintln!("Error setting password for user {}", stash_user);
-        exit(1);
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("Error setting password for user {}", stash_user),
+        ));
     }
+
+    Ok(())
 }
 
 //  Log in as `stash` user and re-execute the program with same `args`.
 fn run_as_stash(stash_user: &str, args: Vec<String>) -> Result<(), io::Error> {
-    let current_exe = env::current_exe().expect("Failed to get current executable path");
-    let mut command = Command::new("sudo");
+    let current_exe = env::current_exe().map_err(|err| {
+        Error::new(
+            ErrorKind::Other,
+            format!("Failed to get current executable path: {}", err),
+        )
+    })?;
 
+    //  Build `sudo` command to re-execute, and pass it CLI args
+    let mut command = Command::new("sudo");
     command.arg("-u").arg(stash_user).arg(current_exe);
     for arg in args {
         command.arg(arg);
     }
-    command.status().expect("Failed to execute as stash user");
+
+    let status = command.status().map_err(|err| {
+        Error::new(
+            ErrorKind::Other,
+            format!("Failed to execute `sudo` command: {}", err),
+        )
+    })?;
+
+    if !status.success() {
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("Failed to execute as `stash` user (exit code: {})", status),
+        ));
+    }
 
     Ok(())
 }
