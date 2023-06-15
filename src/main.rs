@@ -242,7 +242,6 @@ fn main() {
 /// # Examples
 ///
 /// ```rust
-/// fn main() {
 ///     let user = "john";
 ///
 ///     if user_exists(user) {

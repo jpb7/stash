@@ -83,9 +83,7 @@ use std::{
 };
 #[cfg(test)]
 use tempfile::TempDir;
-//use zeroize::Zeroize;
 
-//  TODO: find a way to test this
 #[allow(unused_macros)]
 macro_rules! zeroize_all {
     ($($arg:expr),*) => {
@@ -95,7 +93,6 @@ macro_rules! zeroize_all {
     };
 }
 
-//  TODO: zeroize on drop
 /// Represents a secret consisting of a key and a nonce.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct Secret {
@@ -157,7 +154,6 @@ impl Secret {
     }
 }
 
-//  TODO: zeroize on drop
 /// Represents a stash that holds encrypted files.
 #[derive(Debug, Clone)]
 pub struct Stash {
@@ -165,7 +161,6 @@ pub struct Stash {
     contents: PathBuf,
     is_archived: bool,
     keyring: KeyRing,
-    //secret: Secret,
     db: Db,
 }
 
@@ -229,11 +224,8 @@ impl Stash {
             is_archived = true;
         }
 
-        //let secret_path = path.join(".secret");
         let db_path = path.join(".db");
-        //  TODO: set up session-based encryption/decryption
         let keyring = KeyRing::from_special_id(KeyRingIdentifier::Session, false).unwrap();
-        //let secret = Self::get_secret(&secret_path);
         let db = Self::get_db(&db_path)?;
 
         Ok(Stash {
@@ -241,7 +233,6 @@ impl Stash {
             contents,
             is_archived,
             keyring,
-            //secret,
             db,
         })
     }
@@ -290,29 +281,6 @@ impl Stash {
             })
         }
     }
-
-    /*  TODO: set up session-based encryption/decryption
-    // Read stash-level secrets from hidden file
-    fn get_secret(secrets: &Path) -> Secret {
-        let mut secrets_file;
-        let mut secrets_raw = Vec::new();
-
-        if !secrets.exists() {
-            let secret = Secret::new();
-            secrets_file = fs::File::create(secrets).expect("Failed to create secrets file");
-            secrets_file
-                .write_all(&secret.join())
-                .expect("Failed to write stash key");
-            secret
-        } else {
-            secrets_file = fs::File::open(secrets).expect("Failed to open secrets file");
-            secrets_file
-                .read_to_end(&mut secrets_raw)
-                .expect("Failed to retrieve stash secrets");
-            Secret::from(&secrets_raw)
-        }
-    }
-    */
 
     /// Add a file to the stash, optionally as a copy.
     ///
@@ -418,8 +386,6 @@ impl Stash {
                 )
             })?;
 
-        //zeroize_all!(src_path, dst_path, secret, description, key);
-
         Ok(())
     }
 
@@ -501,7 +467,6 @@ impl Stash {
                     )
                 })?;
             }
-            //key.zeroize();
         } else if let Some(value) = self.db.get(file)? {
             secret = Secret::from(&value);
         } else {
@@ -531,7 +496,6 @@ impl Stash {
         if !copy && file == "contents" {
             self.is_archived = false;
         }
-        //zeroize_all!(src_path, dst_path, secret);
 
         Ok(())
     }
@@ -776,7 +740,6 @@ impl Stash {
             })?;
 
         self.is_archived = true;
-        //zeroize_all!(description, secret);
 
         Ok(())
     }
@@ -860,7 +823,6 @@ impl Stash {
                     format!("Failed to remove encryption secrets from cache: {}", err),
                 )
             })?;
-            //key.zeroize();
         } else if let Some(value) = self.db.get(&description)? {
             secret = Secret::from(&value);
         } else {
@@ -893,7 +855,6 @@ impl Stash {
         })?;
 
         self.is_archived = false;
-        //zeroize_all!(tarball, secret);
 
         Ok(())
     }
