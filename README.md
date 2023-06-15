@@ -1,32 +1,38 @@
 # stash
 
-## Project vision
+## DISCLAIMER ##
+
+It should be stated at the outset that this is a student project. Use this program at your own risk, and don't assume it uses security best practices or even employs `AES` encryption properly. This code has not been audited by anyone in relation to anything.
+
+## About
 
 `stash` is a Linux command-line tool that allows the user to create and manage a directory of encrypted files. The idea is to add an extra layer of privacy and security for sensitive files.
 
 `stash` provides a few simple commands which allow the user to move files into and out of a locked directory called the stash, encrypting or decrypting those files in the process.
 
-For encryption and decryption, `stash` uses the `aes-gcm` crate. It uses the `sled` and `linux-keyutils` crates for persistent secret storage and caching, respectively.
+For encryption and decryption, `stash` uses the [`aes-gcm`](https://crates.io/crates/aes-gcm) crate. Specifically, it uses the `AES-256` variant. Both encryption and decryption are performed byte-by-byte, and have been (casually) tested on various file types including text, audio, and video.
+
+This program uses the [`sled`](https://crates.io/crates/sled) and [`linux-keyutils`](https://crates.io/crates/linux-keyutils) crates for persistent storage and caching, respectively, of encryption secrets. The man page for Linux `keyrings` can be found [here](https://man7.org/linux/man-pages/man7/keyrings.7.html). If you'd like to manually observe or modify key operations related to `stash`, you can do so with the [`keyctl`](https://man7.org/linux/man-pages/man1/keyctl.1.html) program.
+
+## Linux specifics
+
+Note that `stash` is intended to run on modern, single-user Linux distributions. It has only been tested on Ubuntu 22.04. Note too that in order to install and run `stash`, you will need `root` privileges as well as the `useradd` and `sudo` commands. They will be used to create and authenticate the `stash` user.
+
+By default, the `stash` user will be added to the group of the `UID` that creates it. Typically, then, for primary human user with `UID` of `1000`, `stash` will be added to `GID` of `1000`. Specifics might vary according to your local configuration, but the intent here is to give read and write permissions to the `stash` user across your home directory.
+
+In addition to the command mentioned above, this program also makes use of `id`, `sh`, `tar`, and `ls`. It assumes the user has configured `HOME` and `USER` environment variables.
 
 ## Usage
 
-Upon initialization, the user is prompted to create a password for the `stash` user. A new stash will then be created at `~/.stash`.
+Upon initialization, you will be prompted to create a password for the `stash` user. Make sure you can remember or access it if needed, because from this point on you will be using your `sudo` password to run the program. A new stash will then be created at `~/.stash` after successful creation of the `stash` user.
 
-The contents of the stash are viewable with:
-
-	stash list
-
-Basic syntax of the remaining commands is:
-
-	stash <cmd> <file>
-
-So, to encrypt a given file and add it to the stash, use:
+To encrypt a given file and add it to the stash, use:
 
 	stash add <file>
 
 To encrypt a copy of that file into the stash, use:
 
-	stash copy <file>
+	stash add -c <file>
 
 To decrypt a stashed file and drop it into the current directory, use:
 
@@ -34,20 +40,28 @@ To decrypt a stashed file and drop it into the current directory, use:
 
 To decrypt a copy of that stashed file instead, use:
 
-	stash borrow <file>
+	stash grab -c <file>
 
 To delete a stashed file, use:
 
 	stash delete <file>
 
+The contents of the stash are viewable with:
+
+	stash list
+
 All stashed files and directories can be archived into a `.tar.gz` file with:
 ```
 stash archive
 ```
-This will replace everything in the stash with an encrypted tarball called `contents`. To unpack that tarball, use:
+This will replace everything in the stash with an encrypted tarball called `contents`. It will also prevent you from adding anything else to the stash, or from grabbing anything except `contents`. To unpack that tarball and exit archive mode, use:
 ```
 stash unpack
 ```
+You can also delete the `contents` file in order to get out of archive mode.
+
+`NOTE`: it may seem like a silly limitation, but it's important to point out that we have only been manually testing this using `cargo run`: throughout testing, we have only been working with files _in the current directory_ of the project. In other words, if you use filesystem paths to point anywhere else, you're going to get an OS error. Sadly, this program is (currently) only a proof of concept. Supporting real-world paths, directories, globbing, `ls` flags, etc, are all goals for continuing development.
+
 ## Project status
 
 So far we have completed these tasks:
@@ -74,12 +88,20 @@ So far we have completed these tasks:
 - Combined `add()`/`copy()`, and `grab()`/`borrow()`.
 - Changed command interface to use `-c` flag for copy behavior.
 - Added detailed, verbose error handling.
+- Add extensive doc comments via ChatGPT.
+- Add MIT license.
 
 Our next steps will be to:
 
 1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-2. Add doc comments and prepare repo for project submission.
 
-Flex goal:
+Future goals:
 
+- Sort out `stash` user permission errors.
+- Zeroize all sensitive data.
+- Support more flexible file paths.
 - Implement automatic, session-based encryption/decryption of database using `std::thread`.
+- Handle multiple files per `add` or `grab` command.
+- Support directory encryption/decryption.
+- Support passing options to `ls` command via `list`.
+- Possibly support globbing.
