@@ -70,14 +70,16 @@ So far we have completed these tasks:
 - Switched to `sudo` for authentication to avoid repeated password re-entry.
 - Switched to `sled` database for secret storage.
 - Added Linux keys again to cache secrets, avoid disk I/O.
+- Added `is_archived` field to `Stash` struct.
+- Combined `add()`/`copy()`, and `grab()`/`borrow()`.
+- Changed command interface to use `-c` flag for copy behavior.
+- Added detailed, verbose error handling.
 
 Our next steps will be to:
 
 1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
-2. Make error handling more descriptive and robust.
-3. Review and refactor for greater efficiency.
-4. Add doc comments and prepare repo for project submission.
+2. Add doc comments and prepare repo for project submission.
 
 Flex goal:
 
-- Implement automatic, session-based encryption/decryption of database.
+- Implement automatic, session-based encryption/decryption of database using `std::thread`.
