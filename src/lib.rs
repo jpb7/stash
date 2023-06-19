@@ -579,15 +579,6 @@ impl Stash {
             )
         })?;
 
-        //  Delete `contents` file
-        //
-        fs::remove_file(&self.contents).map_err(|err| {
-            Error::new(
-                ErrorKind::Other,
-                format!("Failed to remove `contents` file: {}", err),
-            )
-        })?;
-
         //  Remove `file` encryption secrets from database
         //
         self.db.remove(description).map_err(|err| {
@@ -627,7 +618,7 @@ impl Stash {
         if let Err(err) = result {
             return Err(Error::new(
                 ErrorKind::Other,
-                format!("Failed to encrypt file: {}", err),
+                format!("Failed to encrypt file {}:\n{}", path.to_str().unwrap(), err),
             ));
         }
 
@@ -735,7 +726,7 @@ impl Stash {
         //
         let tar = Command::new("sh")
             .arg("-c")
-            .arg("cd && tar czf contents --remove-files ./*")
+            .arg(format!("$(cd {} && tar czf contents --remove-files ./*)", self.path.to_str().unwrap()))
             .output()
             .map_err(|err| {
                 Error::new(
@@ -761,11 +752,12 @@ impl Stash {
     /// Extracts a `.tar.gz` archive of the stash contents.
     ///
     fn extract_tarball(&self) -> Result<(), io::Error> {
+        //
         //  Change to stash directory and extract tarball
         //
         let tar = Command::new("sh")
             .arg("-c")
-            .arg("cd && tar xzf contents")
+            .arg(format!("$(cd {} && tar xzf contents && rm contents)", self.path.to_str().unwrap()))
             .output()
             .map_err(|err| {
                 Error::new(
@@ -849,7 +841,7 @@ mod tests {
     #[test]
     #[serial]
     //
-    fn test_valid_copy() {
+    fn test_valid_add_copy() {
         let temp_dir = TempDir::new().unwrap();
         let dir_path = temp_dir.path();
         let stash_path = dir_path.join("test_stash");
@@ -892,14 +884,312 @@ mod tests {
         writeln!(file, "{}", test_str).unwrap();
 
         stash.add(&file_str, false).unwrap();
-
         assert!(stashed_file.exists() && !file_path.exists());
+
         let encrypted = fs::read(&stashed_file).unwrap();
         assert_ne!(test_str.as_bytes(), encrypted);
 
         stash.grab(&file_str, false).unwrap();
-
-        assert!(!stashed_file.exists());
-        assert!(file_path.exists());
+        assert!(!stashed_file.exists() && file_path.exists());
+        let decrypted = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(test_str, decrypted.trim());
     }
-}
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_grab_copy() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        let stash_path = dir_path.join("test_stash");
+        let file_path = dir_path.join("test.txt");
+        let file_os_str = file_path.file_name().unwrap();
+        let file_str = file_os_str.to_str().unwrap();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let mut stash = Stash::test(dir_path);
+
+        let mut file = File::create(&file_path).unwrap();
+        let stashed_file = stash_path.join("test.txt");
+        let test_str = "Testing: one, two...";
+        writeln!(file, "{}", test_str).unwrap();
+
+        stash.add(&file_str, false).unwrap();
+        assert!(stashed_file.exists() && !file_path.exists());
+
+        let encrypted = fs::read(&stashed_file).unwrap();
+        assert_ne!(test_str.as_bytes(), encrypted);
+
+        stash.grab(&file_str, true).unwrap();
+        assert!(stashed_file.exists() && file_path.exists());
+        let decrypted = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(test_str, decrypted.trim());
+    }
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_delete() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        let stash_path = dir_path.join("test_stash");
+        let file_path = dir_path.join("test.txt");
+        let file_os_str = file_path.file_name().unwrap();
+        let file_str = file_os_str.to_str().unwrap();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let mut stash = Stash::test(dir_path);
+
+        let mut file = File::create(&file_path).unwrap();
+        let stashed_file = stash_path.join("test.txt");
+        let test_str = "Testing: one, two...";
+        writeln!(file, "{}", test_str).unwrap();
+
+        stash.add(&file_str, false).unwrap();
+        assert!(stashed_file.exists() && !file_path.exists());
+        
+        stash.delete(&file_str).unwrap();
+        assert!(!stashed_file.exists());
+    }
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let stash_path = dir_path.join("test_stash");
+        let file_path1 = dir_path.join("test1");
+        let file_path2 = dir_path.join("test2");
+        let file_path3 = dir_path.join("test3");
+
+        let mut stash = Stash::test(dir_path);
+
+        let _ = File::create(&file_path1).unwrap();
+        let _ = File::create(&file_path2).unwrap();
+        let _ = File::create(&file_path3).unwrap();
+        stash.add("test1", false).unwrap();
+        stash.add("test2", false).unwrap();
+        stash.add("test3", false).unwrap();
+
+        let stashed_file1 = stash_path.join("test1");
+        let stashed_file2 = stash_path.join("test2");
+        let stashed_file3 = stash_path.join("test3");
+        assert!(stashed_file1.exists() && !file_path1.exists());
+        assert!(stashed_file2.exists() && !file_path2.exists());
+        assert!(stashed_file3.exists() && !file_path3.exists());
+
+        let actual = stash.list().unwrap();
+        let mock = format!("test1\ntest2\ntest3");
+        assert_eq!(actual, mock);
+    }
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_archive() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let stash_path = dir_path.join("test_stash");
+        let file_path1 = dir_path.join("test1");
+        let file_path2 = dir_path.join("test2");
+        let file_path3 = dir_path.join("test3");
+
+        let mut stash = Stash::test(dir_path);
+        let test_str = "Testing: one, two...";
+
+        let mut file1 = File::create(&file_path1).unwrap();
+        let mut file2 = File::create(&file_path2).unwrap();
+        let mut file3 = File::create(&file_path3).unwrap();
+        writeln!(file1, "{}", test_str).unwrap();
+        writeln!(file2, "{}", test_str).unwrap();
+        writeln!(file3, "{}", test_str).unwrap();
+        stash.add("test1", false).unwrap();
+        stash.add("test2", false).unwrap();
+        stash.add("test3", false).unwrap();
+
+        let stashed_file1 = stash_path.join("test1");
+        let stashed_file2 = stash_path.join("test2");
+        let stashed_file3 = stash_path.join("test3");
+        assert!(stashed_file1.exists() && !file_path1.exists());
+        assert!(stashed_file2.exists() && !file_path2.exists());
+        assert!(stashed_file3.exists() && !file_path3.exists());
+
+        stash.archive().unwrap();
+        assert!(stash.contents.exists());
+        assert_eq!(stash.list().unwrap(), "contents");
+    }
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_unpack() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let stash_path = dir_path.join("test_stash");
+        let file_path1 = dir_path.join("test1");
+        let file_path2 = dir_path.join("test2");
+        let file_path3 = dir_path.join("test3");
+
+        let mut stash = Stash::test(dir_path);
+        let test_str = "Testing: one, two...";
+
+        let mut file1 = File::create(&file_path1).unwrap();
+        let mut file2 = File::create(&file_path2).unwrap();
+        let mut file3 = File::create(&file_path3).unwrap();
+        writeln!(file1, "{}", test_str).unwrap();
+        writeln!(file2, "{}", test_str).unwrap();
+        writeln!(file3, "{}", test_str).unwrap();
+        stash.add("test1", false).unwrap();
+        stash.add("test2", false).unwrap();
+        stash.add("test3", false).unwrap();
+
+        let stashed_file1 = stash_path.join("test1");
+        let stashed_file2 = stash_path.join("test2");
+        let stashed_file3 = stash_path.join("test3");
+        assert!(stashed_file1.exists() && !file_path1.exists());
+        assert!(stashed_file2.exists() && !file_path2.exists());
+        assert!(stashed_file3.exists() && !file_path3.exists());
+
+        let before_archiving = stash.list().unwrap();
+        stash.archive().unwrap();
+        assert_eq!(stash.list().unwrap(), "contents");
+        stash.unpack().unwrap();
+        assert_eq!(stash.list().unwrap(), before_archiving);
+    }
+
+    #[test]
+    #[serial]
+    fn test_valid_encrypt() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+
+        let secret = Secret::new();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let file_path = dir_path.join("test");
+        let mut file = File::create(&file_path).unwrap();
+        let test_str = "Testing: one, two...";
+        writeln!(file, "{}", test_str).unwrap();
+
+        let result = Stash::encrypt(&file_path, &secret);
+        assert!(result.is_ok());
+
+        let encrypted = fs::read(&file_path).unwrap();
+        assert_ne!(test_str.as_bytes(), encrypted);
+     }
+
+    #[test]
+    #[serial]
+    fn test_valid_decrypt() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+
+        let secret = Secret::new();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let file_path = dir_path.join("test");
+        let mut file = File::create(&file_path).unwrap();
+        let test_str = "Testing: one, two...";
+        writeln!(file, "{}", test_str).unwrap();
+
+        let result = Stash::encrypt(&file_path, &secret);
+        assert!(result.is_ok());
+
+        let encrypted = fs::read(&file_path).unwrap();
+        assert_ne!(test_str.as_bytes(), encrypted);
+
+        let result = Stash::decrypt(&file_path, &secret);
+        assert!(result.is_ok());
+
+        let decrypted = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(test_str, decrypted.trim());
+    }
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_create_tarball() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let stash_path = dir_path.join("test_stash");
+        let file_path1 = dir_path.join("test1");
+        let file_path2 = dir_path.join("test2");
+        let file_path3 = dir_path.join("test3");
+
+        let mut stash = Stash::test(dir_path);
+        let test_str = "Testing: one, two...";
+
+        let mut file1 = File::create(&file_path1).unwrap();
+        let mut file2 = File::create(&file_path2).unwrap();
+        let mut file3 = File::create(&file_path3).unwrap();
+        writeln!(file1, "{}", test_str).unwrap();
+        writeln!(file2, "{}", test_str).unwrap();
+        writeln!(file3, "{}", test_str).unwrap();
+        stash.add("test1", false).unwrap();
+        stash.add("test2", false).unwrap();
+        stash.add("test3", false).unwrap();
+
+        let stashed_file1 = stash_path.join("test1");
+        let stashed_file2 = stash_path.join("test2");
+        let stashed_file3 = stash_path.join("test3");
+        assert!(stashed_file1.exists() && !file_path1.exists());
+        assert!(stashed_file2.exists() && !file_path2.exists());
+        assert!(stashed_file3.exists() && !file_path3.exists());
+
+        let result = stash.create_tarball();
+        assert!(result.is_ok());
+        assert!(stash.contents.exists());
+        assert_eq!(stash.list().unwrap(), "contents");
+    }
+
+    #[test]
+    #[serial]
+    //
+    fn test_valid_extract_tarball() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path();
+        env::set_current_dir(&dir_path).unwrap();
+
+        let stash_path = dir_path.join("test_stash");
+        let file_path1 = dir_path.join("test1");
+        let file_path2 = dir_path.join("test2");
+        let file_path3 = dir_path.join("test3");
+
+        let mut stash = Stash::test(dir_path);
+        let test_str = "Testing: one, two...";
+
+        let mut file1 = File::create(&file_path1).unwrap();
+        let mut file2 = File::create(&file_path2).unwrap();
+        let mut file3 = File::create(&file_path3).unwrap();
+        writeln!(file1, "{}", test_str).unwrap();
+        writeln!(file2, "{}", test_str).unwrap();
+        writeln!(file3, "{}", test_str).unwrap();
+        stash.add("test1", false).unwrap();
+        stash.add("test2", false).unwrap();
+        stash.add("test3", false).unwrap();
+
+        let stashed_file1 = stash_path.join("test1");
+        let stashed_file2 = stash_path.join("test2");
+        let stashed_file3 = stash_path.join("test3");
+        assert!(stashed_file1.exists() && !file_path1.exists());
+        assert!(stashed_file2.exists() && !file_path2.exists());
+        assert!(stashed_file3.exists() && !file_path3.exists());
+
+        let before_archiving = stash.list().unwrap();
+        let mut result = stash.create_tarball();
+        assert!(result.is_ok());
+        assert_eq!(stash.list().unwrap(), "contents");
+        result = stash.extract_tarball();
+        assert!(result.is_ok());
+        assert_eq!(stash.list().unwrap(), before_archiving);
+    }
+ }
