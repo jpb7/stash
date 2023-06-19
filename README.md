@@ -88,17 +88,15 @@ So far we have completed these tasks:
 - Combined `add()`/`copy()`, and `grab()`/`borrow()`.
 - Changed command interface to use `-c` flag for copy behavior.
 - Added detailed, verbose error handling.
-- Add extensive doc comments via ChatGPT.
-- Add MIT license.
-
-Our next steps will be to:
-
-1. Rewrite unit tests to use our `Stash` object, and re-integrate them into the project.
+- Added extensive doc comments via ChatGPT.
+- Added MIT license.
+- Removed bot comments, replaced with human comments.
+- Added unit tests for valid cases of all core methods.
 
 Future goals:
 
-- Sort out `stash` user permission errors.
 - Zeroize all sensitive data.
+- Prevent OS from creating graphical login for `stash` user.
 - Support more flexible file paths.
 - Implement automatic, session-based encryption/decryption of database using `std::thread`.
 - Handle multiple files per `add` or `grab` command.
